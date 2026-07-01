@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { sql } from "@/db/client";
 import { verifyGroupToken } from "@/auth/token";
 import { computeGameBoard, type DatedGameEntry } from "@/scoring/gameBoard";
+import { isDailyBoardLocked } from "@/scoring/noPeek";
 import { localDateInTz } from "@/lib/day";
 import { windowStart, type Window } from "@/lib/window";
 
@@ -22,6 +23,7 @@ export async function GET(
 
   const param = new URL(req.url).searchParams.get("window");
   const window: Window = WINDOWS.includes(param as Window) ? (param as Window) : "daily";
+  const viewer = new URL(req.url).searchParams.get("player") ?? "";
 
   const groupRows = (await sql`SELECT timezone FROM groups WHERE id = ${groupId}`) as {
     timezone: string;
@@ -50,6 +52,13 @@ export async function GET(
     metric_direction: "lower_better" | "higher_better";
   }[];
 
+  const playedToday = rows.some(
+    (r) => r.display_name === viewer && r.puzzle_date === today,
+  );
+  if (isDailyBoardLocked(window, playedToday)) {
+    return NextResponse.json({ gameId, window, locked: true, players: [] });
+  }
+
   const names = new Map(rows.map((r) => [r.player_id, r.display_name]));
   const entries: DatedGameEntry[] = rows.map((r) => ({
     playerId: r.player_id,
@@ -70,5 +79,5 @@ export async function GET(
     currentStreak: s.currentStreak,
     longestStreak: s.longestStreak,
   }));
-  return NextResponse.json({ gameId, window, players });
+  return NextResponse.json({ gameId, window, locked: false, players });
 }
