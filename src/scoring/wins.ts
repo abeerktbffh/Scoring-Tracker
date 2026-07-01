@@ -8,7 +8,7 @@ export interface GameEntry {
   direction: "lower_better" | "higher_better";
 }
 
-function isBetter(a: number, b: number, dir: GameEntry["direction"]): boolean {
+export function isBetter(a: number, b: number, dir: GameEntry["direction"]): boolean {
   return dir === "lower_better" ? a < b : a > b;
 }
 

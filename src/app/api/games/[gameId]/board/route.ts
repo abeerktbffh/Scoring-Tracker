@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { sql } from "@/db/client";
 import { verifyGroupToken } from "@/auth/token";
-import { computeOverall } from "@/scoring/leaderboard";
-import type { GameEntry } from "@/scoring/wins";
+import { computeGameBoard, type DatedGameEntry } from "@/scoring/gameBoard";
 import { localDateInTz } from "@/lib/day";
 import { windowStart, type Window } from "@/lib/window";
 
@@ -11,11 +10,15 @@ export const runtime = "nodejs";
 
 const WINDOWS: Window[] = ["daily", "weekly", "monthly", "all"];
 
-export async function GET(req: Request) {
+export async function GET(
+  req: Request,
+  { params }: { params: { gameId: string } },
+) {
   const token = cookies().get("group_token")?.value;
   const payload = token ? await verifyGroupToken(token) : null;
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const groupId = payload.groupId;
+  const gameId = params.gameId;
 
   const param = new URL(req.url).searchParams.get("window");
   const window: Window = WINDOWS.includes(param as Window) ? (param as Window) : "daily";
@@ -27,20 +30,19 @@ export async function GET(req: Request) {
   const today = localDateInTz(groupRows[0].timezone);
   const start = windowStart(window, today);
 
+  // Fetch ALL of the game's on-time active entries (streaks are all-time).
   const rows = (await sql`
-    SELECT e.player_id, p.display_name, e.game_id, e.variant, e.puzzle_date::text AS puzzle_date,
-           e.parsed_value, e.solved, g.metric_direction
+    SELECT e.player_id, p.display_name, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
+           g.metric_direction
     FROM entries e
     JOIN players p ON p.id = e.player_id
     JOIN games g ON g.id = e.game_id
-    WHERE e.group_id = ${groupId}
+    WHERE e.group_id = ${groupId} AND e.game_id = ${gameId}
       AND e.superseded_by IS NULL AND e.is_late = false
-      AND (${start}::date IS NULL OR e.puzzle_date >= ${start}::date)
       AND e.puzzle_date <= ${today}::date
   `) as {
     player_id: string;
     display_name: string;
-    game_id: string;
     variant: string | null;
     puzzle_date: string;
     parsed_value: number;
@@ -49,21 +51,24 @@ export async function GET(req: Request) {
   }[];
 
   const names = new Map(rows.map((r) => [r.player_id, r.display_name]));
-  const gameEntries: GameEntry[] = rows.map((r) => ({
+  const entries: DatedGameEntry[] = rows.map((r) => ({
     playerId: r.player_id,
-    gameId: r.game_id,
+    gameId,
     variant: r.variant,
-    puzzleKey: `${r.game_id}|${r.puzzle_date}`,
+    puzzleKey: `${gameId}|${r.puzzle_date}`,
     value: r.parsed_value,
     solved: r.solved,
     direction: r.metric_direction,
+    puzzleDate: r.puzzle_date,
   }));
 
-  const players = computeOverall(gameEntries).map((s) => ({
+  const players = computeGameBoard(entries, today, start).map((s) => ({
     displayName: names.get(s.playerId) ?? s.playerId,
     wins: s.wins,
     gamesPlayed: s.gamesPlayed,
-    winRate: s.winRate,
+    bestValue: s.bestValue,
+    currentStreak: s.currentStreak,
+    longestStreak: s.longestStreak,
   }));
-  return NextResponse.json({ window, players });
+  return NextResponse.json({ gameId, window, players });
 }
