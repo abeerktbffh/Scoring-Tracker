@@ -11,4 +11,15 @@ describe("detectAndParse", () => {
   it("returns null when no parser matches", () => {
     expect(detectAndParse("random text nobody parses")).toBeNull();
   });
+
+  it("returns null when a matching parser's parse() throws", () => {
+    const boom = {
+      gameId: "boom",
+      detect: () => true,
+      parse: () => {
+        throw new Error("boom");
+      },
+    };
+    expect(detectAndParse("anything", [boom])).toBeNull();
+  });
 });

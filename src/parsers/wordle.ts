@@ -1,6 +1,6 @@
 import type { Parser, ParseResult } from "./types";
 
-const LINE = /Wordle\s+([\d,]+)\s+([X\d])\/6/i;
+const LINE = /^Wordle\s+([\d,]+)\s+([X\d])\/6/im;
 
 export const wordleParser: Parser = {
   gameId: "wordle",

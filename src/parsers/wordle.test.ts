@@ -7,6 +7,12 @@ describe("wordle parser", () => {
     expect(wordleParser.detect("Connections\nPuzzle #123")).toBe(false);
   });
 
+  it("does not detect Wordle embedded mid-sentence", () => {
+    expect(
+      wordleParser.detect("I love talking about Wordle 234 3/6 with friends"),
+    ).toBe(false);
+  });
+
   it("parses a solved result with a comma-formatted puzzle number", () => {
     expect(wordleParser.parse("Wordle 1,234 3/6\n\n⬛🟨⬛⬛⬛")).toEqual({
       gameId: "wordle",
