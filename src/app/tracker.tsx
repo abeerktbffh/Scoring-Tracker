@@ -27,20 +27,26 @@ export function Tracker() {
 
   const [window, setWindow] = useState<Window>("daily");
   const [overall, setOverall] = useState<OverallRow[]>([]);
+  const [overallLocked, setOverallLocked] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("wins");
   const [boardGameId, setBoardGameId] = useState("");
   const [gameBoard, setGameBoard] = useState<GameRow[]>([]);
+  const [boardLocked, setBoardLocked] = useState(false);
+
+  const [adminPass, setAdminPass] = useState("");
+  const [players, setPlayers] = useState<{ id: string; displayName: string }[]>([]);
+  const [ng, setNg] = useState({ id: "", name: "", type: "timed", metricDirection: "lower_better", hasVariants: false, parserId: "" });
 
   const markAuthed = () => { setAuthed(true); authedRef.current = true; };
 
   const loadOverall = useCallback(async (w: Window) => {
     try {
-      const res = await fetch(`/api/leaderboard?window=${w}`);
-      if (res.ok) { setOverall((await res.json()).players); markAuthed(); return; }
+      const res = await fetch(`/api/leaderboard?window=${w}&player=${encodeURIComponent(displayName)}`);
+      if (res.ok) { const d = await res.json(); setOverall(d.players); setOverallLocked(!!d.locked); markAuthed(); return; }
       if (res.status === 401) return;
       if (authedRef.current) setMessage("Couldn't refresh the leaderboard — try again.");
     } catch { if (authedRef.current) setMessage("Couldn't refresh the leaderboard — try again."); }
-  }, []);
+  }, [displayName]);
 
   const loadGames = useCallback(async () => {
     const res = await fetch("/api/games");
@@ -53,13 +59,19 @@ export function Tracker() {
 
   const loadGameBoard = useCallback(async (g: string, w: Window) => {
     if (!g) return;
-    const res = await fetch(`/api/games/${g}/board?window=${w}`);
-    if (res.ok) setGameBoard((await res.json()).players);
+    const res = await fetch(`/api/games/${g}/board?window=${w}&player=${encodeURIComponent(displayName)}`);
+    if (res.ok) { const d = await res.json(); setGameBoard(d.players); setBoardLocked(!!d.locked); }
+  }, [displayName]);
+
+  const loadPlayers = useCallback(async () => {
+    const res = await fetch("/api/players");
+    if (res.ok) setPlayers((await res.json()).players);
   }, []);
 
   useEffect(() => { loadOverall(window); }, [loadOverall, window]);
   useEffect(() => { if (authed) loadGames(); }, [authed, loadGames]);
   useEffect(() => { if (authed && boardGameId) loadGameBoard(boardGameId, window); }, [authed, boardGameId, window, loadGameBoard]);
+  useEffect(() => { if (authed) loadPlayers(); }, [authed, loadPlayers]);
 
   async function submitPassphrase(e: React.FormEvent) {
     e.preventDefault();
@@ -101,6 +113,27 @@ export function Tracker() {
       : (/^\d+$/.test(manualValue.trim()) ? Number(manualValue.trim()) : null);
     if (value === null) { setMessage("Enter a valid value (time as m:ss, or a number)"); return; }
     if (await submitEntry({ gameId, variant: game.hasVariants ? variant : null, value, solved })) setManualValue("");
+  }
+
+  async function addGame(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/admin/games", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ adminPassphrase: adminPass, ...ng }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setMessage(res.ok ? `Added game: ${d.game?.name}` : (d.error ?? "Add game failed"));
+    if (res.ok) { setNg({ id: "", name: "", type: "timed", metricDirection: "lower_better", hasVariants: false, parserId: "" }); loadGames(); }
+  }
+
+  async function renamePlayer(playerId: string, newName: string) {
+    const res = await fetch("/api/admin/players/rename", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ adminPassphrase: adminPass, playerId, newName }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Renamed" : (d.error ?? "Rename failed"));
+    if (res.ok) { loadPlayers(); loadOverall(window); }
   }
 
   if (!authed) {
@@ -168,16 +201,20 @@ export function Tracker() {
             <option value="monthly">Monthly</option><option value="all">All-time</option>
           </select>
         </label>
-        <table>
-          <thead><tr><th>Player</th>{th("Wins", "wins")}{th("Played", "gamesPlayed")}{th("Win %", "winRate")}</tr></thead>
-          <tbody>
-            {sortedOverall.map((r) => (
-              <tr key={r.displayName}>
-                <td>{r.displayName}</td><td>{r.wins}</td><td>{r.gamesPlayed}</td><td>{Math.round(r.winRate * 100)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {overallLocked
+          ? <p>Play today&apos;s puzzles to reveal today&apos;s leaderboard.</p>
+          : (
+            <table>
+              <thead><tr><th>Player</th>{th("Wins", "wins")}{th("Played", "gamesPlayed")}{th("Win %", "winRate")}</tr></thead>
+              <tbody>
+                {sortedOverall.map((r) => (
+                  <tr key={r.displayName}>
+                    <td>{r.displayName}</td><td>{r.wins}</td><td>{r.gamesPlayed}</td><td>{Math.round(r.winRate * 100)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
       </section>
 
       <section>
@@ -185,18 +222,59 @@ export function Tracker() {
         <select value={boardGameId} onChange={(e) => setBoardGameId(e.target.value)}>
           {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
-        <table>
-          <thead><tr><th>Player</th><th>Wins</th><th>Best</th><th>Current streak</th><th>Longest streak</th></tr></thead>
-          <tbody>
-            {gameBoard.map((r) => (
-              <tr key={r.displayName}>
-                <td>{r.displayName}</td><td>{r.wins}</td><td>{r.bestValue ?? "—"}</td>
-                <td>{r.currentStreak}</td><td>{r.longestStreak}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {boardLocked
+          ? <p>Play today&apos;s game to see today&apos;s board.</p>
+          : (
+            <table>
+              <thead><tr><th>Player</th><th>Wins</th><th>Best</th><th>Current streak</th><th>Longest streak</th></tr></thead>
+              <tbody>
+                {gameBoard.map((r) => (
+                  <tr key={r.displayName}>
+                    <td>{r.displayName}</td><td>{r.wins}</td><td>{r.bestValue ?? "—"}</td>
+                    <td>{r.currentStreak}</td><td>{r.longestStreak}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </section>
+
+      <section>
+        <h2>Admin</h2>
+        <input type="password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} placeholder="admin passphrase" />
+        <h3>Add a game</h3>
+        <form onSubmit={addGame}>
+          <input value={ng.id} onChange={(e) => setNg({ ...ng, id: e.target.value })} placeholder="id (e.g. strands)" />
+          <input value={ng.name} onChange={(e) => setNg({ ...ng, name: e.target.value })} placeholder="Name" />
+          <select value={ng.type} onChange={(e) => setNg({ ...ng, type: e.target.value })}>
+            <option value="timed">timed</option><option value="outcome">outcome</option>
+          </select>
+          <select value={ng.metricDirection} onChange={(e) => setNg({ ...ng, metricDirection: e.target.value })}>
+            <option value="lower_better">lower is better</option><option value="higher_better">higher is better</option>
+          </select>
+          <label><input type="checkbox" checked={ng.hasVariants} onChange={(e) => setNg({ ...ng, hasVariants: e.target.checked })} /> has difficulties</label>
+          <input value={ng.parserId} onChange={(e) => setNg({ ...ng, parserId: e.target.value })} placeholder="parserId (optional)" />
+          <button type="submit">Add game</button>
+        </form>
+        <h3>Players</h3>
+        <ul>
+          {players.map((p) => (
+            <li key={p.id}>
+              <RenameRow player={p} onRename={renamePlayer} />
+            </li>
+          ))}
+        </ul>
       </section>
     </main>
+  );
+}
+
+function RenameRow({ player, onRename }: { player: { id: string; displayName: string }; onRename: (id: string, name: string) => void }) {
+  const [name, setName] = useState(player.displayName);
+  return (
+    <>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <button onClick={() => onRename(player.id, name)}>Rename</button>
+    </>
   );
 }
