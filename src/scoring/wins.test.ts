@@ -15,6 +15,17 @@ describe("tallyWins", () => {
     ]);
   });
 
+  it("awards the win to the best (highest) value when higher_better", () => {
+    const entries: GameEntry[] = [
+      { ...base, direction: "higher_better", playerId: "a", value: 10, solved: true },
+      { ...base, direction: "higher_better", playerId: "b", value: 20, solved: true },
+    ];
+    expect(tallyWins(entries)).toEqual([
+      { playerId: "b", wins: 1 },
+      { playerId: "a", wins: 0 },
+    ]);
+  });
+
   it("gives co-wins on a tie", () => {
     const entries: GameEntry[] = [
       { ...base, playerId: "a", value: 3, solved: true },

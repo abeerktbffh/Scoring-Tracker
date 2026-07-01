@@ -20,16 +20,20 @@ export function tallyWins(entries: GameEntry[]): { playerId: string; wins: numbe
   const groups = new Map<string, GameEntry[]>();
   for (const e of entries) {
     const key = `${e.gameId}|${e.variant ?? ""}|${e.puzzleKey}`;
-    (groups.get(key) ?? groups.set(key, []).get(key)!).push(e);
+    let g = groups.get(key);
+    if (!g) {
+      g = [];
+      groups.set(key, g);
+    }
+    g.push(e);
   }
 
   for (const group of groups.values()) {
     const solved = group.filter((e) => e.solved);
-    const contenders = solved.length > 0 ? solved : [];
-    if (contenders.length === 0) continue;
-    let best = contenders[0].value;
-    for (const e of contenders) if (isBetter(e.value, best, e.direction)) best = e.value;
-    for (const e of contenders) if (e.value === best) wins.set(e.playerId, wins.get(e.playerId)! + 1);
+    if (solved.length === 0) continue;
+    let best = solved[0].value;
+    for (const e of solved) if (isBetter(e.value, best, e.direction)) best = e.value;
+    for (const e of solved) if (e.value === best) wins.set(e.playerId, wins.get(e.playerId)! + 1);
   }
 
   return [...wins.entries()]
