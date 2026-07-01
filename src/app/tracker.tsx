@@ -2,8 +2,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { parseClock } from "@/lib/time";
 
-type Row = { displayName: string; wins: number };
 type Game = { id: string; name: string; type: string; metricDirection: string; hasVariants: boolean };
+type OverallRow = { displayName: string; wins: number; gamesPlayed: number; winRate: number };
+type GameRow = {
+  displayName: string; wins: number; gamesPlayed: number;
+  bestValue: number | null; currentStreak: number; longestStreak: number;
+};
+type Window = "daily" | "weekly" | "monthly" | "all";
+type SortKey = "wins" | "gamesPlayed" | "winRate";
 
 export function Tracker() {
   const [authed, setAuthed] = useState(false);
@@ -13,69 +19,68 @@ export function Tracker() {
   const [pin, setPin] = useState("");
   const [rawInput, setRawInput] = useState("");
   const [message, setMessage] = useState("");
-  const [board, setBoard] = useState<Row[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [gameId, setGameId] = useState("");
   const [variant, setVariant] = useState("easy");
   const [manualValue, setManualValue] = useState("");
   const [solved, setSolved] = useState(true);
 
+  const [window, setWindow] = useState<Window>("daily");
+  const [overall, setOverall] = useState<OverallRow[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey>("wins");
+  const [boardGameId, setBoardGameId] = useState("");
+  const [gameBoard, setGameBoard] = useState<GameRow[]>([]);
+
   const markAuthed = () => { setAuthed(true); authedRef.current = true; };
+
+  const loadOverall = useCallback(async (w: Window) => {
+    try {
+      const res = await fetch(`/api/leaderboard?window=${w}`);
+      if (res.ok) { setOverall((await res.json()).players); markAuthed(); return; }
+      if (res.status === 401) return;
+      if (authedRef.current) setMessage("Couldn't refresh the leaderboard — try again.");
+    } catch { if (authedRef.current) setMessage("Couldn't refresh the leaderboard — try again."); }
+  }, []);
 
   const loadGames = useCallback(async () => {
     const res = await fetch("/api/games");
     if (res.ok) {
       const data = await res.json();
       setGames(data.games);
-      if (data.games[0] && !gameId) setGameId(data.games[0].id);
-    }
-  }, [gameId]);
-
-  const loadBoard = useCallback(async () => {
-    try {
-      const res = await fetch("/api/leaderboard");
-      if (res.ok) {
-        const data = await res.json();
-        setBoard(data.players);
-        markAuthed();
-        return;
-      }
-      if (res.status === 401) return; // not authenticated yet — show gate
-      if (authedRef.current) setMessage("Couldn't refresh the leaderboard — try again.");
-    } catch {
-      if (authedRef.current) setMessage("Couldn't refresh the leaderboard — try again.");
+      if (data.games[0]) { setGameId((g) => g || data.games[0].id); setBoardGameId((g) => g || data.games[0].id); }
     }
   }, []);
 
-  useEffect(() => {
-    loadBoard();
-  }, [loadBoard]);
+  const loadGameBoard = useCallback(async (g: string, w: Window) => {
+    if (!g) return;
+    const res = await fetch(`/api/games/${g}/board?window=${w}`);
+    if (res.ok) setGameBoard((await res.json()).players);
+  }, []);
 
-  useEffect(() => {
-    if (authed) loadGames();
-  }, [authed, loadGames]);
+  useEffect(() => { loadOverall(window); }, [loadOverall, window]);
+  useEffect(() => { if (authed) loadGames(); }, [authed, loadGames]);
+  useEffect(() => { if (authed && boardGameId) loadGameBoard(boardGameId, window); }, [authed, boardGameId, window, loadGameBoard]);
 
   async function submitPassphrase(e: React.FormEvent) {
     e.preventDefault();
     const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+      method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ passphrase }),
     });
-    if (res.ok) { markAuthed(); loadBoard(); loadGames(); }
-    else { const data = await res.json().catch(() => ({})); setMessage(data.error ?? "Wrong passphrase"); }
+    if (res.ok) { markAuthed(); loadOverall(window); loadGames(); }
+    else { const d = await res.json().catch(() => ({})); setMessage(d.error ?? "Wrong passphrase"); }
   }
 
   async function submitEntry(payload: object) {
     const res = await fetch("/api/entries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+      method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ displayName, pin, ...payload }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setMessage(`Saved: ${data.parsed?.gameId ?? "entry"} (${data.parsed?.value ?? ""})`);
-      loadBoard();
+      loadOverall(window);
+      loadGameBoard(boardGameId, window);
       return true;
     }
     setMessage(data.error ?? "Something went wrong — try again.");
@@ -91,9 +96,9 @@ export function Tracker() {
     e.preventDefault();
     const game = games.find((g) => g.id === gameId);
     if (!game) { setMessage("Pick a game"); return; }
-    let value: number | null;
-    if (game.type === "timed") value = parseClock(manualValue);
-    else value = /^\d+$/.test(manualValue.trim()) ? Number(manualValue.trim()) : null;
+    const value = game.type === "timed"
+      ? parseClock(manualValue)
+      : (/^\d+$/.test(manualValue.trim()) ? Number(manualValue.trim()) : null);
     if (value === null) { setMessage("Enter a valid value (time as m:ss, or a number)"); return; }
     if (await submitEntry({ gameId, variant: game.hasVariants ? variant : null, value, solved })) setManualValue("");
   }
@@ -110,10 +115,17 @@ export function Tracker() {
   }
 
   const selectedGame = games.find((g) => g.id === gameId);
+  const sortedOverall = [...overall].sort((a, b) => b[sortKey] - a[sortKey]);
+  const th = (label: string, key: SortKey) => (
+    <th onClick={() => setSortKey(key)} style={{ cursor: "pointer" }}>
+      {label}{sortKey === key ? " ▼" : ""}
+    </th>
+  );
 
   return (
     <main>
       <h1>Scoring Tracker</h1>
+
       <section>
         <h2>Who are you?</h2>
         <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" />
@@ -136,16 +148,11 @@ export function Tracker() {
           </select>
           {selectedGame?.hasVariants && (
             <select value={variant} onChange={(e) => setVariant(e.target.value)}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+              <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
             </select>
           )}
-          <input
-            value={manualValue}
-            onChange={(e) => setManualValue(e.target.value)}
-            placeholder={selectedGame?.type === "timed" ? "time m:ss" : "guesses / mistakes"}
-          />
+          <input value={manualValue} onChange={(e) => setManualValue(e.target.value)}
+            placeholder={selectedGame?.type === "timed" ? "time m:ss" : "guesses / mistakes"} />
           <label><input type="checkbox" checked={solved} onChange={(e) => setSolved(e.target.checked)} /> Solved</label>
           <button type="submit">Submit manually</button>
         </form>
@@ -153,13 +160,43 @@ export function Tracker() {
 
       <p>{message}</p>
 
-      <h2>Today — Wins</h2>
-      <table>
-        <thead><tr><th>Player</th><th>Wins</th></tr></thead>
-        <tbody>
-          {board.map((r) => <tr key={r.displayName}><td>{r.displayName}</td><td>{r.wins}</td></tr>)}
-        </tbody>
-      </table>
+      <section>
+        <h2>Leaderboard</h2>
+        <label>Window:{" "}
+          <select value={window} onChange={(e) => setWindow(e.target.value as Window)}>
+            <option value="daily">Daily</option><option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option><option value="all">All-time</option>
+          </select>
+        </label>
+        <table>
+          <thead><tr><th>Player</th>{th("Wins", "wins")}{th("Played", "gamesPlayed")}{th("Win %", "winRate")}</tr></thead>
+          <tbody>
+            {sortedOverall.map((r) => (
+              <tr key={r.displayName}>
+                <td>{r.displayName}</td><td>{r.wins}</td><td>{r.gamesPlayed}</td><td>{Math.round(r.winRate * 100)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Per-game board</h2>
+        <select value={boardGameId} onChange={(e) => setBoardGameId(e.target.value)}>
+          {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <table>
+          <thead><tr><th>Player</th><th>Wins</th><th>Best</th><th>Current streak</th><th>Longest streak</th></tr></thead>
+          <tbody>
+            {gameBoard.map((r) => (
+              <tr key={r.displayName}>
+                <td>{r.displayName}</td><td>{r.wins}</td><td>{r.bestValue ?? "—"}</td>
+                <td>{r.currentStreak}</td><td>{r.longestStreak}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
     </main>
   );
 }
