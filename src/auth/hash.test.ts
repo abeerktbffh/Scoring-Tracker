@@ -17,4 +17,12 @@ describe("secret hashing", () => {
     const b = await hashSecret("same");
     expect(a).not.toBe(b);
   });
+
+  it("resolves to false (not throws) for a malformed stored value with no colon", async () => {
+    expect(await verifySecret("anything", "garbage-no-colon")).toBe(false);
+  });
+
+  it("resolves to false for an empty stored value", async () => {
+    expect(await verifySecret("x", "")).toBe(false);
+  });
 });

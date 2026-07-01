@@ -26,7 +26,11 @@ export async function POST(req: Request) {
     pin?: string;
     rawInput?: string;
   };
-  if (!displayName || !pin || !rawInput) {
+  if (
+    typeof displayName !== "string" || displayName.length === 0 ||
+    typeof pin !== "string" || pin.length === 0 ||
+    typeof rawInput !== "string" || rawInput.length === 0
+  ) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 

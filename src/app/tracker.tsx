@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 type Row = { displayName: string; wins: number };
 
 export function Tracker() {
   const [authed, setAuthed] = useState(false);
+  const authedRef = useRef(false);
   const [passphrase, setPassphrase] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [pin, setPin] = useState("");
@@ -13,25 +14,26 @@ export function Tracker() {
   const [board, setBoard] = useState<Row[]>([]);
 
   const loadBoard = useCallback(async () => {
+    const reportRefreshFailure = () => {
+      if (authedRef.current) {
+        setMessage("Couldn't refresh the leaderboard — try again.");
+      }
+    };
+
     try {
       const res = await fetch("/api/leaderboard");
       if (res.ok) {
         const data = await res.json();
         setBoard(data.players);
+        authedRef.current = true;
         setAuthed(true);
       } else if (res.status === 401) {
         // Normal unauthenticated state — the gate is shown; stay silent.
       } else {
-        setAuthed((prev) => {
-          if (prev) setMessage("Couldn't refresh the leaderboard — try again.");
-          return prev;
-        });
+        reportRefreshFailure();
       }
     } catch {
-      setAuthed((prev) => {
-        if (prev) setMessage("Couldn't refresh the leaderboard — try again.");
-        return prev;
-      });
+      reportRefreshFailure();
     }
   }, []);
 
@@ -47,6 +49,7 @@ export function Tracker() {
       body: JSON.stringify({ passphrase }),
     });
     if (res.ok) {
+      authedRef.current = true;
       setAuthed(true);
       loadBoard();
     } else {

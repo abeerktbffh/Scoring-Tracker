@@ -9,6 +9,7 @@ export async function issueGroupToken(groupId: string): Promise<string> {
   return new SignJWT({ groupId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
+    .setExpirationTime("30d")
     .sign(key());
 }
 
