@@ -52,6 +52,7 @@ export async function GET(req: Request) {
   // No-peek: for the daily window, only reveal games the viewer has played today.
   let visibleRows = rows;
   let locked = false;
+  // No-peek is a UX/fairness aid, not a security boundary: the viewer is an unauthenticated display-name param and this only ever restricts (never widens) what is shown.
   if (window === "daily") {
     const playedGameIds = new Set(
       rows.filter((r) => r.display_name === viewer).map((r) => r.game_id),

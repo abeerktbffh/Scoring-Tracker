@@ -271,6 +271,7 @@ export function Tracker() {
 
 function RenameRow({ player, onRename }: { player: { id: string; displayName: string }; onRename: (id: string, name: string) => void }) {
   const [name, setName] = useState(player.displayName);
+  useEffect(() => setName(player.displayName), [player.displayName]);
   return (
     <>
       <input value={name} onChange={(e) => setName(e.target.value)} />

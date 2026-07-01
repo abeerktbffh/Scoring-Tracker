@@ -52,6 +52,7 @@ export async function GET(
     metric_direction: "lower_better" | "higher_better";
   }[];
 
+  // No-peek is a UX/fairness aid, not a security boundary: the viewer is an unauthenticated display-name param and this only ever restricts (never widens) what is shown.
   const playedToday = rows.some(
     (r) => r.display_name === viewer && r.puzzle_date === today,
   );
