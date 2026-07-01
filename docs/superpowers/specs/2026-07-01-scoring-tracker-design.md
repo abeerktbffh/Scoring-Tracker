@@ -25,15 +25,16 @@ weighed against that.
 - Paste-first score entry with auto-detect + manual fallback.
 - **Configurable games**: built-in parsers for a curated set, plus the ability
   to add manual-entry games via config (see §9 for the honest limits of this).
-- Leaderboard ranked by **wins**, across **Daily / Weekly / Monthly / All-time**
-  windows, plus **per-game boards**.
+- **Sortable, filterable leaderboard** (wins, games played, win rate, streaks)
+  across **Daily / Weekly / Monthly / All-time** windows, plus **per-game boards**.
 - Honor-system integrity with cheap guards: PIN, daily submission lock, and an
   append-only audit trail.
 - Runs entirely on **free tiers, no credit card required**.
 
 ### Deferred (roadmap — data model must not preclude these)
 - 0–100 same-day performance-score model (fancier than win-counting).
-- Streaks, notifications, daily recaps.
+- Notifications, daily recaps, win-streak column. (Participation streaks are
+  in v1 — see §6.)
 - Multiple independent groups / leagues (UI).
 - Leaderboard caching / materialization.
 - Automated backups.
@@ -108,13 +109,26 @@ annoyed friends). The manual fallback keeps the app usable meanwhile.
   time; `solved` beats unsolved). Best result **wins** that game for the day.
 - **Ties** → co-wins (all tied players get a win).
 - **Solo** → a single player who logs a game still wins it.
-- **Overall leaderboard = total wins**, computed over Daily / Weekly / Monthly /
-  All-time windows. All-time is framed as a "hall of fame" (it rewards
-  longevity/volume); Daily/Weekly are the live competition.
+- **Leaderboard is a sortable, filterable table.** Rows are players; columns are
+  metrics, each computed over the selected time window (Daily / Weekly / Monthly /
+  All-time) and optionally scoped to a single game. Sort by any column; default
+  sort is **Wins**. Columns:
+  - **Wins** — games won (per §rules above).
+  - **Games played** — count of on-time active entries.
+  - **Win rate** — wins ÷ games played.
+  - **Current streak** — consecutive puzzle-days (group timezone), up to the most
+    recent, with ≥1 on-time active entry. A missed day breaks it.
+  - **Longest streak** — the maximum such run in the window.
+- **Consistency rule:** only **on-time (non-`is_late`) active entries** count
+  toward *any* metric — wins, games played, and streaks alike — so the daily-lock
+  anti-cheat rule can't be sidestepped via participation/streak metrics.
+- All-time is framed as a "hall of fame" (it rewards longevity/volume);
+  Daily/Weekly are the live competition.
 - **Per-game boards** — each game has its own view (most wins, best time /
-  fewest guesses). For games with variants, boards are per difficulty.
-- Aggregation is a **pure function** over entries so it can later be memoized /
-  materialized without a rewrite (deferred).
+  fewest guesses, per-game streaks). For games with variants, boards are per
+  difficulty.
+- Every metric is a **pure function** over entries so the board can later be
+  memoized / materialized without a rewrite (deferred).
 
 ## 7. Integrity (honor system + cheap guards)
 
@@ -186,6 +200,9 @@ real free tier and no silent-billing component. (2) *Portable* — plain Postgre
   difficulties, Connections grids, LinkedIn time formats, Patches.
 - **Scoring/win logic**: unit tests for ties, solo wins, unsolved, late-exclusion,
   and per-variant grouping.
+- **Leaderboard metrics**: unit tests for each sortable column (wins, games
+  played, win rate, current/longest streak), including streak-break on a missed
+  day and the on-time-only consistency rule.
 - **Auth**: tests that API routes reject missing/invalid tokens and enforce PINs.
 - **End-to-end**: one light flow — paste → confirm → save → appears on leaderboard.
 
