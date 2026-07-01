@@ -2,9 +2,12 @@ CREATE TABLE IF NOT EXISTS groups (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
   passphrase_hash TEXT NOT NULL,
+  admin_passphrase_hash TEXT,
   timezone      TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS admin_passphrase_hash TEXT;
 
 CREATE TABLE IF NOT EXISTS players (
   id           TEXT PRIMARY KEY,
