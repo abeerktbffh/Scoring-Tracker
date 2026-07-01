@@ -11,6 +11,32 @@ type GameRow = {
 type Window = "daily" | "weekly" | "monthly" | "all";
 type SortKey = "wins" | "gamesPlayed" | "winRate";
 
+const WINDOWS: { k: Window; label: string }[] = [
+  { k: "daily", label: "Daily" },
+  { k: "weekly", label: "Weekly" },
+  { k: "monthly", label: "Monthly" },
+  { k: "all", label: "All-time" },
+];
+
+function Brand() {
+  return (
+    <header className="brand">
+      <div className="tiles" aria-hidden="true"><i /><i /><i /><i /></div>
+      <h1>Scoring Tracker</h1>
+      <p>your group&apos;s daily puzzle standings</p>
+    </header>
+  );
+}
+
+function Locked({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="locked">
+      <div className="lockrow" aria-hidden="true"><i /><i /><i /><i /></div>
+      <p>{children}</p>
+    </div>
+  );
+}
+
 export function Tracker() {
   const [authed, setAuthed] = useState(false);
   const authedRef = useRef(false);
@@ -138,130 +164,153 @@ export function Tracker() {
 
   if (!authed) {
     return (
-      <form onSubmit={submitPassphrase}>
-        <h1>Enter group passphrase</h1>
-        <input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder="passphrase" />
-        <button type="submit">Enter</button>
-        <p>{message}</p>
-      </form>
+      <div className="gate">
+        <Brand />
+        <div className="card">
+          <h2>Enter group passphrase</h2>
+          <form onSubmit={submitPassphrase}>
+            <div className="row">
+              <input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder="passphrase" />
+            </div>
+            <button type="submit">Enter</button>
+          </form>
+          {message && <p className="msg">{message}</p>}
+        </div>
+      </div>
     );
   }
 
   const selectedGame = games.find((g) => g.id === gameId);
   const sortedOverall = [...overall].sort((a, b) => b[sortKey] - a[sortKey]);
   const th = (label: string, key: SortKey) => (
-    <th onClick={() => setSortKey(key)} style={{ cursor: "pointer" }}>
-      {label}{sortKey === key ? " ▼" : ""}
+    <th className="sortable" onClick={() => setSortKey(key)}>
+      {label}{sortKey === key ? " ▾" : ""}
     </th>
   );
 
   return (
-    <main>
-      <h1>Scoring Tracker</h1>
+    <main className="app">
+      <Brand />
 
-      <section>
+      <section className="card">
         <h2>Who are you?</h2>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" />
-        <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN" />
+        <div className="row">
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" />
+          <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN" />
+        </div>
+        <p className="hint">Pick a name and a PIN once — the PIN keeps your scores yours.</p>
       </section>
 
-      <section>
-        <h2>Paste a result</h2>
+      <section className="card">
+        <h2>Log a result</h2>
         <form onSubmit={submitPaste}>
-          <textarea value={rawInput} onChange={(e) => setRawInput(e.target.value)} placeholder="Paste your result (e.g. Wordle 1,234 3/6)" />
+          <textarea value={rawInput} onChange={(e) => setRawInput(e.target.value)} placeholder="Paste your share text — e.g. Wordle 1,234 3/6" />
           <button type="submit">Submit paste</button>
         </form>
-      </section>
-
-      <section>
-        <h2>Or enter manually</h2>
+        <h3>Or enter it by hand</h3>
         <form onSubmit={submitManual}>
-          <select value={gameId} onChange={(e) => { setGameId(e.target.value); setVariant("easy"); }}>
-            {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-          {selectedGame?.hasVariants && (
-            <select value={variant} onChange={(e) => setVariant(e.target.value)}>
-              <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
+          <div className="row">
+            <select value={gameId} onChange={(e) => { setGameId(e.target.value); setVariant("easy"); }}>
+              {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
-          )}
-          <input value={manualValue} onChange={(e) => setManualValue(e.target.value)}
-            placeholder={selectedGame?.type === "timed" ? "time m:ss" : "guesses / mistakes"} />
-          <label><input type="checkbox" checked={solved} onChange={(e) => setSolved(e.target.checked)} /> Solved</label>
+            {selectedGame?.hasVariants && (
+              <select value={variant} onChange={(e) => setVariant(e.target.value)}>
+                <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
+              </select>
+            )}
+            <input value={manualValue} onChange={(e) => setManualValue(e.target.value)}
+              placeholder={selectedGame?.type === "timed" ? "time m:ss" : "guesses / mistakes"} />
+            <label className="check"><input type="checkbox" checked={solved} onChange={(e) => setSolved(e.target.checked)} /> Solved</label>
+          </div>
           <button type="submit">Submit manually</button>
         </form>
+        {message && <p className="msg">{message}</p>}
       </section>
 
-      <p>{message}</p>
-
-      <section>
+      <section className="card board">
         <h2>Leaderboard</h2>
-        <label>Window:{" "}
-          <select value={window} onChange={(e) => setWindow(e.target.value as Window)}>
-            <option value="daily">Daily</option><option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option><option value="all">All-time</option>
-          </select>
-        </label>
-        {overallLocked
-          ? <p>Play today&apos;s puzzles to reveal today&apos;s leaderboard.</p>
-          : (
+        <div className="seg" role="group" aria-label="Time window">
+          {WINDOWS.map((w) => (
+            <button key={w.k} type="button" aria-pressed={window === w.k} onClick={() => setWindow(w.k)}>{w.label}</button>
+          ))}
+        </div>
+        {overallLocked ? (
+          <Locked>Log one of today&apos;s puzzles to reveal today&apos;s standings.</Locked>
+        ) : (
+          <div className="table-wrap">
             <table>
               <thead><tr><th>Player</th>{th("Wins", "wins")}{th("Played", "gamesPlayed")}{th("Win %", "winRate")}</tr></thead>
               <tbody>
-                {sortedOverall.map((r) => (
+                {sortedOverall.map((r, i) => (
                   <tr key={r.displayName}>
-                    <td>{r.displayName}</td><td>{r.wins}</td><td>{r.gamesPlayed}</td><td>{Math.round(r.winRate * 100)}%</td>
+                    <td><span className="player"><span className="rank">{i + 1}</span>{r.displayName}{i === 0 ? " 👑" : ""}</span></td>
+                    <td className="num">{r.wins}</td>
+                    <td className="num">{r.gamesPlayed}</td>
+                    <td className="num rate">{Math.round(r.winRate * 100)}%</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
+          </div>
+        )}
       </section>
 
-      <section>
+      <section className="card">
         <h2>Per-game board</h2>
-        <select value={boardGameId} onChange={(e) => setBoardGameId(e.target.value)}>
-          {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
-        {boardLocked
-          ? <p>Play today&apos;s game to see today&apos;s board.</p>
-          : (
+        <div className="row">
+          <select value={boardGameId} onChange={(e) => setBoardGameId(e.target.value)}>
+            {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+        {boardLocked ? (
+          <Locked>Play today&apos;s game to unlock its board.</Locked>
+        ) : (
+          <div className="table-wrap">
             <table>
-              <thead><tr><th>Player</th><th>Wins</th><th>Best</th><th>Current streak</th><th>Longest streak</th></tr></thead>
+              <thead><tr><th>Player</th><th>Wins</th><th>Best</th><th>Streak</th><th>Longest</th></tr></thead>
               <tbody>
-                {gameBoard.map((r) => (
+                {gameBoard.map((r, i) => (
                   <tr key={r.displayName}>
-                    <td>{r.displayName}</td><td>{r.wins}</td><td>{r.bestValue ?? "—"}</td>
-                    <td>{r.currentStreak}</td><td>{r.longestStreak}</td>
+                    <td><span className="player"><span className="rank">{i + 1}</span>{r.displayName}</span></td>
+                    <td className="num">{r.wins}</td>
+                    <td className="num">{r.bestValue ?? "—"}</td>
+                    <td className={"num streak" + (r.currentStreak > 0 ? " live" : "")}>
+                      {r.currentStreak > 0 ? `🔥 ${r.currentStreak}` : "0"}
+                    </td>
+                    <td className="num">{r.longestStreak}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
+          </div>
+        )}
       </section>
 
-      <section>
+      <section className="card admin">
         <h2>Admin</h2>
-        <input type="password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} placeholder="admin passphrase" />
+        <div className="row">
+          <input type="password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} placeholder="admin passphrase" />
+        </div>
         <h3>Add a game</h3>
         <form onSubmit={addGame}>
-          <input value={ng.id} onChange={(e) => setNg({ ...ng, id: e.target.value })} placeholder="id (e.g. strands)" />
-          <input value={ng.name} onChange={(e) => setNg({ ...ng, name: e.target.value })} placeholder="Name" />
-          <select value={ng.type} onChange={(e) => setNg({ ...ng, type: e.target.value })}>
-            <option value="timed">timed</option><option value="outcome">outcome</option>
-          </select>
-          <select value={ng.metricDirection} onChange={(e) => setNg({ ...ng, metricDirection: e.target.value })}>
-            <option value="lower_better">lower is better</option><option value="higher_better">higher is better</option>
-          </select>
-          <label><input type="checkbox" checked={ng.hasVariants} onChange={(e) => setNg({ ...ng, hasVariants: e.target.checked })} /> has difficulties</label>
-          <input value={ng.parserId} onChange={(e) => setNg({ ...ng, parserId: e.target.value })} placeholder="parserId (optional)" />
+          <div className="row">
+            <input value={ng.id} onChange={(e) => setNg({ ...ng, id: e.target.value })} placeholder="id (e.g. strands)" />
+            <input value={ng.name} onChange={(e) => setNg({ ...ng, name: e.target.value })} placeholder="Name" />
+            <select value={ng.type} onChange={(e) => setNg({ ...ng, type: e.target.value })}>
+              <option value="timed">timed</option><option value="outcome">outcome</option>
+            </select>
+            <select value={ng.metricDirection} onChange={(e) => setNg({ ...ng, metricDirection: e.target.value })}>
+              <option value="lower_better">lower is better</option><option value="higher_better">higher is better</option>
+            </select>
+            <label className="check"><input type="checkbox" checked={ng.hasVariants} onChange={(e) => setNg({ ...ng, hasVariants: e.target.checked })} /> difficulties</label>
+            <input value={ng.parserId} onChange={(e) => setNg({ ...ng, parserId: e.target.value })} placeholder="parserId (optional)" />
+          </div>
           <button type="submit">Add game</button>
         </form>
         <h3>Players</h3>
-        <ul>
+        <ul className="players-list">
           {players.map((p) => (
-            <li key={p.id}>
-              <RenameRow player={p} onRename={renamePlayer} />
-            </li>
+            <li key={p.id}><RenameRow player={p} onRename={renamePlayer} /></li>
           ))}
         </ul>
       </section>
@@ -275,7 +324,7 @@ function RenameRow({ player, onRename }: { player: { id: string; displayName: st
   return (
     <>
       <input value={name} onChange={(e) => setName(e.target.value)} />
-      <button onClick={() => onRename(player.id, name)}>Rename</button>
+      <button type="button" onClick={() => onRename(player.id, name)}>Rename</button>
     </>
   );
 }
