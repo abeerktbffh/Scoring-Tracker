@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { localDateInTz } from "./day";
+import { localDateInTz, toDayNumber, fromDayNumber } from "./day";
 
 describe("localDateInTz", () => {
   it("rolls to the next local day past the UTC midnight boundary (IST)", () => {
@@ -18,5 +18,17 @@ describe("localDateInTz", () => {
 
   it("returns the plain UTC date for a UTC group", () => {
     expect(localDateInTz("UTC", new Date("2026-07-01T23:59:00Z"))).toBe("2026-07-01");
+  });
+});
+
+describe("day numbers", () => {
+  it("round-trips a date through day numbers", () => {
+    expect(fromDayNumber(toDayNumber("2026-07-01"))).toBe("2026-07-01");
+  });
+  it("consecutive days differ by exactly 1", () => {
+    expect(toDayNumber("2026-07-02") - toDayNumber("2026-07-01")).toBe(1);
+  });
+  it("spans month boundaries", () => {
+    expect(toDayNumber("2026-08-01") - toDayNumber("2026-07-31")).toBe(1);
   });
 });
