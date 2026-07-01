@@ -3,9 +3,9 @@ import { cookies } from "next/headers";
 import { sql } from "@/db/client";
 import { verifyGroupToken } from "@/auth/token";
 import { hashSecret, verifySecret } from "@/auth/hash";
-import { detectAndParse } from "@/parsers/registry";
 import { newId } from "@/lib/ids";
 import { localDateInTz } from "@/lib/day";
+import { resolveSubmission } from "@/lib/submission";
 
 export const runtime = "nodejs";
 
@@ -20,29 +20,27 @@ export async function POST(req: Request) {
   const groupId = await requireGroup();
   if (!groupId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({}));
-  const { displayName, pin, rawInput } = body as {
-    displayName?: string;
-    pin?: string;
-    rawInput?: string;
-  };
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const { displayName, pin } = body as { displayName?: string; pin?: string };
   if (
     typeof displayName !== "string" || displayName.length === 0 ||
-    typeof pin !== "string" || pin.length === 0 ||
-    typeof rawInput !== "string" || rawInput.length === 0
+    typeof pin !== "string" || pin.length === 0
   ) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const parsed = detectAndParse(rawInput);
-  if (!parsed) {
-    return NextResponse.json({ error: "Could not parse result" }, { status: 422 });
+  const resolved = resolveSubmission(body);
+  if ("error" in resolved) {
+    if (typeof body.rawInput === "string" && resolved.status === 422) {
+      // Surface parser drift: a share text we failed to recognize.
+      console.warn("[parse-failure]", body.rawInput.slice(0, 120));
+    }
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }
 
-  // Resolve the group's timezone so the puzzle-day is filed in local time.
-  const groupRows = (await sql`
-    SELECT timezone FROM groups WHERE id = ${groupId}
-  `) as { timezone: string }[];
+  const groupRows = (await sql`SELECT timezone FROM groups WHERE id = ${groupId}`) as {
+    timezone: string;
+  }[];
   if (!groupRows[0]) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const timezone = groupRows[0].timezone;
 
@@ -67,7 +65,7 @@ export async function POST(req: Request) {
 
   // Verify the game exists in this group.
   const game = (await sql`
-    SELECT id FROM games WHERE id = ${parsed.gameId} AND group_id = ${groupId}
+    SELECT id FROM games WHERE id = ${resolved.gameId} AND group_id = ${groupId}
   `) as { id: string }[];
   if (!game[0]) return NextResponse.json({ error: "Unknown game" }, { status: 422 });
 
@@ -75,8 +73,8 @@ export async function POST(req: Request) {
   const puzzleDate = localDateInTz(timezone);
   const priorRows = (await sql`
     SELECT id, version FROM entries
-    WHERE group_id = ${groupId} AND player_id = ${playerId} AND game_id = ${parsed.gameId}
-      AND puzzle_date = ${puzzleDate} AND (variant IS NOT DISTINCT FROM ${parsed.variant})
+    WHERE group_id = ${groupId} AND player_id = ${playerId} AND game_id = ${resolved.gameId}
+      AND puzzle_date = ${puzzleDate} AND (variant IS NOT DISTINCT FROM ${resolved.variant})
       AND superseded_by IS NULL
   `) as { id: string; version: number }[];
 
@@ -85,12 +83,13 @@ export async function POST(req: Request) {
   await sql`
     INSERT INTO entries (id, group_id, player_id, game_id, variant, puzzle_date,
       puzzle_number, raw_input, parsed_value, solved, is_late, version)
-    VALUES (${entryId}, ${groupId}, ${playerId}, ${parsed.gameId}, ${parsed.variant},
-      ${puzzleDate}, ${parsed.puzzleNumber}, ${rawInput}, ${parsed.value}, ${parsed.solved}, false, ${version})
+    VALUES (${entryId}, ${groupId}, ${playerId}, ${resolved.gameId}, ${resolved.variant},
+      ${puzzleDate}, ${resolved.puzzleNumber}, ${resolved.rawInput}, ${resolved.value},
+      ${resolved.solved}, false, ${version})
   `;
   if (priorRows[0]) {
     await sql`UPDATE entries SET superseded_by = ${entryId} WHERE id = ${priorRows[0].id}`;
   }
 
-  return NextResponse.json({ ok: true, parsed });
+  return NextResponse.json({ ok: true, parsed: resolved });
 }
