@@ -1,4 +1,4 @@
-import { tallyWins, type GameEntry } from "./wins";
+import { tallyWins, isBetter, type GameEntry } from "./wins";
 import { currentStreak, longestStreak } from "./streaks";
 
 export type DatedGameEntry = GameEntry & { puzzleDate: string };
@@ -10,10 +10,6 @@ export interface GameBoardStat {
   bestValue: number | null;
   currentStreak: number;
   longestStreak: number;
-}
-
-function isBetter(a: number, b: number, dir: GameEntry["direction"]): boolean {
-  return dir === "lower_better" ? a < b : a > b;
 }
 
 export function computeGameBoard(
