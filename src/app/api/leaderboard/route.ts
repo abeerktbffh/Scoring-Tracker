@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   const start = windowStart(window, today);
 
   const rows = (await sql`
-    SELECT e.player_id, p.display_name, e.game_id, e.variant, e.puzzle_date,
+    SELECT e.player_id, p.display_name, e.game_id, e.variant, e.puzzle_date::text AS puzzle_date,
            e.parsed_value, e.solved, g.metric_direction
     FROM entries e
     JOIN players p ON p.id = e.player_id
