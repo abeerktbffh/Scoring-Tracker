@@ -19,6 +19,7 @@ export async function GET(req: Request) {
 
   const param = new URL(req.url).searchParams.get("window");
   const window: Window = WINDOWS.includes(param as Window) ? (param as Window) : "daily";
+  const viewer = new URL(req.url).searchParams.get("player") ?? "";
 
   const groupRows = (await sql`SELECT timezone FROM groups WHERE id = ${groupId}`) as {
     timezone: string;
@@ -48,8 +49,19 @@ export async function GET(req: Request) {
     metric_direction: "lower_better" | "higher_better";
   }[];
 
-  const names = new Map(rows.map((r) => [r.player_id, r.display_name]));
-  const gameEntries: GameEntry[] = rows.map((r) => ({
+  // No-peek: for the daily window, only reveal games the viewer has played today.
+  let visibleRows = rows;
+  let locked = false;
+  if (window === "daily") {
+    const playedGameIds = new Set(
+      rows.filter((r) => r.display_name === viewer).map((r) => r.game_id),
+    );
+    locked = playedGameIds.size === 0;
+    visibleRows = rows.filter((r) => playedGameIds.has(r.game_id));
+  }
+
+  const names = new Map(visibleRows.map((r) => [r.player_id, r.display_name]));
+  const gameEntries: GameEntry[] = visibleRows.map((r) => ({
     playerId: r.player_id,
     gameId: r.game_id,
     variant: r.variant,
@@ -65,5 +77,5 @@ export async function GET(req: Request) {
     gamesPlayed: s.gamesPlayed,
     winRate: s.winRate,
   }));
-  return NextResponse.json({ window, players });
+  return NextResponse.json({ window, locked, players });
 }
