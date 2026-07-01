@@ -13,11 +13,25 @@ export function Tracker() {
   const [board, setBoard] = useState<Row[]>([]);
 
   const loadBoard = useCallback(async () => {
-    const res = await fetch("/api/leaderboard");
-    if (res.ok) {
-      const data = await res.json();
-      setBoard(data.players);
-      setAuthed(true);
+    try {
+      const res = await fetch("/api/leaderboard");
+      if (res.ok) {
+        const data = await res.json();
+        setBoard(data.players);
+        setAuthed(true);
+      } else if (res.status === 401) {
+        // Normal unauthenticated state — the gate is shown; stay silent.
+      } else {
+        setAuthed((prev) => {
+          if (prev) setMessage("Couldn't refresh the leaderboard — try again.");
+          return prev;
+        });
+      }
+    } catch {
+      setAuthed((prev) => {
+        if (prev) setMessage("Couldn't refresh the leaderboard — try again.");
+        return prev;
+      });
     }
   }, []);
 
@@ -36,7 +50,8 @@ export function Tracker() {
       setAuthed(true);
       loadBoard();
     } else {
-      setMessage("Wrong passphrase");
+      const data = await res.json().catch(() => ({}));
+      setMessage(data.error ?? "Wrong passphrase");
     }
   }
 
@@ -47,13 +62,13 @@ export function Tracker() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ displayName, pin, rawInput }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setMessage(`Saved: ${data.parsed.gameId} (${data.parsed.value})`);
+      setMessage(`Saved: ${data.parsed?.gameId ?? "entry"} (${data.parsed?.value ?? ""})`);
       setRawInput("");
       loadBoard();
     } else {
-      setMessage(data.error ?? "Error");
+      setMessage(data.error ?? "Something went wrong — try again.");
     }
   }
 
