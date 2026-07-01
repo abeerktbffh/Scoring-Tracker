@@ -95,7 +95,7 @@ export function Tracker() {
     if (game.type === "timed") value = parseClock(manualValue);
     else value = /^\d+$/.test(manualValue.trim()) ? Number(manualValue.trim()) : null;
     if (value === null) { setMessage("Enter a valid value (time as m:ss, or a number)"); return; }
-    await submitEntry({ gameId, variant: game.hasVariants ? variant : null, value, solved });
+    if (await submitEntry({ gameId, variant: game.hasVariants ? variant : null, value, solved })) setManualValue("");
   }
 
   if (!authed) {
@@ -131,7 +131,7 @@ export function Tracker() {
       <section>
         <h2>Or enter manually</h2>
         <form onSubmit={submitManual}>
-          <select value={gameId} onChange={(e) => setGameId(e.target.value)}>
+          <select value={gameId} onChange={(e) => { setGameId(e.target.value); setVariant("easy"); }}>
             {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
           {selectedGame?.hasVariants && (

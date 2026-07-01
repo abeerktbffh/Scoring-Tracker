@@ -43,7 +43,7 @@ export async function GET() {
     playerId: r.player_id,
     gameId: r.game_id,
     variant: r.variant,
-    puzzleKey: r.puzzle_number != null ? `${r.game_id}|${r.puzzle_number}` : `${r.game_id}|${r.puzzle_date}`,
+    puzzleKey: `${r.game_id}|${r.puzzle_date}`,
     value: r.parsed_value,
     solved: r.solved,
     direction: r.metric_direction,

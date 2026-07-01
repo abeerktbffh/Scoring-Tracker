@@ -27,4 +27,16 @@ describe("pips parser", () => {
   it("throws on non-Pips text", () => {
     expect(() => pipsParser.parse("hello")).toThrow();
   });
+  it("parses a Medium result", () => {
+    expect(pipsParser.parse("Pips #318 Medium 🟡\n2:05")).toEqual({
+      gameId: "pips",
+      puzzleNumber: 318,
+      variant: "medium",
+      value: 125,
+      solved: true,
+    });
+  });
+  it("throws when the time line is missing", () => {
+    expect(() => pipsParser.parse("Pips #317 Hard 🔴")).toThrow();
+  });
 });

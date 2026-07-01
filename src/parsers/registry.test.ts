@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { detectAndParse } from "./registry";
-import { pipsParser } from "./pips";
-import { connectionsParser } from "./connections";
-import { minuteCrypticParser } from "./minuteCryptic";
-import { queensParser } from "./linkedin";
 
 describe("detectAndParse", () => {
   it("routes Wordle text to the Wordle parser", () => {
