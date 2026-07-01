@@ -1,7 +1,19 @@
 import type { Parser, ParseResult } from "./types";
 import { wordleParser } from "./wordle";
+import { pipsParser } from "./pips";
+import { connectionsParser } from "./connections";
+import { minuteCrypticParser } from "./minuteCryptic";
+import { queensParser, tangoParser, miniSudokuParser } from "./linkedin";
 
-export const parsers = [wordleParser];
+export const parsers: Parser[] = [
+  wordleParser,
+  pipsParser,
+  connectionsParser,
+  minuteCrypticParser,
+  queensParser,
+  tangoParser,
+  miniSudokuParser,
+];
 
 export function detectAndParse(
   text: string,

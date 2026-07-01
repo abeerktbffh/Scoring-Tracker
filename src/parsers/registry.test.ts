@@ -23,3 +23,18 @@ describe("detectAndParse", () => {
     expect(detectAndParse("anything", [boom])).toBeNull();
   });
 });
+
+describe("detectAndParse routes every known game", () => {
+  const cases: [string, string, string][] = [
+    ["wordle", "Wordle 1,838 3/6", "wordle"],
+    ["pips", "Pips #317 Hard 🔴\n9:53", "pips"],
+    ["connections", "Connections\nPuzzle #1116\n🟨🟨🟨🟨\n🟩🟩🟩🟩\n🟦🟦🟦🟦\n🟪🟪🟪🟪", "connections"],
+    ["minute-cryptic", "Minute Cryptic - 1 July, 2026\n🏆 0 hints", "minute-cryptic"],
+    ["queens", "Queens #792\n0:31 👑", "queens"],
+    ["tango", "Tango #632\n0:23 🌗", "tango"],
+    ["mini-sudoku", "Mini Sudoku #324 | 0:38 ✏️", "mini-sudoku"],
+  ];
+  it.each(cases)("routes %s text to the right parser", (_label, text, expectedGameId) => {
+    expect(detectAndParse(text)?.gameId).toBe(expectedGameId);
+  });
+});
