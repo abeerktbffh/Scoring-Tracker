@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { sql } from "@/db/client";
 import { verifyGroupToken } from "@/auth/token";
 import { tallyWins, type GameEntry } from "@/scoring/wins";
+import { localDateInTz } from "@/lib/day";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,11 @@ export async function GET() {
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const groupId = payload.groupId;
 
-  const puzzleDate = new Date().toISOString().slice(0, 10);
+  const groupRows = (await sql`
+    SELECT timezone FROM groups WHERE id = ${groupId}
+  `) as { timezone: string }[];
+  if (!groupRows[0]) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const puzzleDate = localDateInTz(groupRows[0].timezone);
   const rows = (await sql`
     SELECT e.player_id, p.display_name, e.game_id, e.variant, e.puzzle_date,
            e.puzzle_number, e.parsed_value, e.solved, g.metric_direction

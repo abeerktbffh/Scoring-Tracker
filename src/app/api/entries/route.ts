@@ -5,6 +5,7 @@ import { verifyGroupToken } from "@/auth/token";
 import { hashSecret, verifySecret } from "@/auth/hash";
 import { detectAndParse } from "@/parsers/registry";
 import { newId } from "@/lib/ids";
+import { localDateInTz } from "@/lib/day";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not parse result" }, { status: 422 });
   }
 
+  // Resolve the group's timezone so the puzzle-day is filed in local time.
+  const groupRows = (await sql`
+    SELECT timezone FROM groups WHERE id = ${groupId}
+  `) as { timezone: string }[];
+  if (!groupRows[0]) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const timezone = groupRows[0].timezone;
+
   // Find or create the player, enforcing PIN.
   const existing = (await sql`
     SELECT id, pin_hash FROM players WHERE group_id = ${groupId} AND display_name = ${displayName}
@@ -60,7 +68,7 @@ export async function POST(req: Request) {
   if (!game[0]) return NextResponse.json({ error: "Unknown game" }, { status: 422 });
 
   // Append-only: supersede any prior active entry for this player/game/variant/day.
-  const puzzleDate = new Date().toISOString().slice(0, 10);
+  const puzzleDate = localDateInTz(timezone);
   const priorRows = (await sql`
     SELECT id, version FROM entries
     WHERE group_id = ${groupId} AND player_id = ${playerId} AND game_id = ${parsed.gameId}
