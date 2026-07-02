@@ -69,6 +69,10 @@ own `spec → plan → subagent-driven build` cycle.
   14.2.x (surfaced by the Dev Foundation review, 2026-07-02). Fix is a breaking major upgrade,
   so it gets its own spec → plan → heavily-tested build. **Priority: near-term** (target: soon
   after workstream A). Interim risk accepted: no sensitive data, server-side DB creds only.
+- **Sentry `global-error.tsx`** — the App Router has no global error boundary, so top-level
+  React *render* errors aren't captured (API/server errors and parse-drift alerts already are).
+  Flagged by the Dev Foundation final review (2026-07-02); out of scope there (errors-only, no
+  product surface). Small; pair it with the Next.js upgrade or the UX workstream (B).
 - **Uptime monitoring** — a simple "is the site reachable" check; add as multi-group (C) nears.
 
 ## Sequence & rationale
