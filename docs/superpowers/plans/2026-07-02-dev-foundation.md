@@ -175,21 +175,31 @@ git commit -m "chore: add Dependabot and apply safe npm audit fixes"
 
 **Files:**
 - Modify: `package.json` (dependency), `next.config.mjs`
-- Create: `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`
+- Create: `instrumentation-client.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`
 - Modify: `src/app/api/entries/route.ts` (drift alert)
 - Modify: `.env.example` (document the DSN vars)
+
+> **Reviewer-corrected (2026-07-02):** current `@sentry/nextjs` (v10.x) uses
+> `instrumentation-client.ts` for the browser (NOT the old `sentry.client.config.ts`),
+> and Next.js **14.2.x requires `experimental: { instrumentationHook: true }`** for the
+> server `instrumentation.ts` to register. Both are applied below, and the SDK is
+> pinned to avoid version drift. Both failure modes are *silent* (monitoring simply
+> doesn't turn on), so acceptance is a **real test event reaching Sentry** (Task 6 Step 4),
+> not just a passing build.
 
 **Interfaces:**
 - Consumes: nothing.
 - Produces: runtime error capture (no-op when DSN unset) and a `[parse-failure]` alert to Sentry. No new exported functions.
 
-- [ ] **Step 1: Install the SDK**
+- [ ] **Step 1: Install the SDK (pinned to avoid version drift)**
 
-Run: `npm install @sentry/nextjs`
+Run: `npm install @sentry/nextjs@^10`
+(Pinning the major keeps the file-name/config conventions below stable. If a newer major
+is installed, re-verify its client-instrumentation filename before proceeding.)
 
 - [ ] **Step 2: Create the Sentry init configs (errors only, no tracing)**
 
-`sentry.client.config.ts`:
+`instrumentation-client.ts` *(browser errors — current v10 convention; replaces the old `sentry.client.config.ts`)*:
 ```ts
 import * as Sentry from "@sentry/nextjs";
 
@@ -241,7 +251,11 @@ export async function register() {
 import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  // Required on Next 14.2.x so `instrumentation.ts` (server/edge Sentry init) registers.
+  // (Stabilized in Next 15; still experimental in 14.2.)
+  experimental: { instrumentationHook: true },
+};
 
 // No SENTRY_AUTH_TOKEN → source-map upload is skipped (build still succeeds).
 export default withSentryConfig(nextConfig, {
@@ -293,7 +307,7 @@ Expected: all pass (120 tests).
 - [ ] **Step 9: Commit**
 
 ```bash
-git add package.json package-lock.json next.config.mjs sentry.client.config.ts sentry.server.config.ts sentry.edge.config.ts instrumentation.ts src/app/api/entries/route.ts .env.example
+git add package.json package-lock.json next.config.mjs instrumentation-client.ts sentry.server.config.ts sentry.edge.config.ts instrumentation.ts src/app/api/entries/route.ts .env.example
 git commit -m "feat: Sentry error monitoring + parser-drift alert (no-op without DSN)"
 ```
 
@@ -404,4 +418,6 @@ Once CI is green, the independent review gate returns ✅, and branch protection
 
 **Placeholder scan:** No TBD/TODO. Task 1 Step 5 ("fix what lint reports") is discovery-based by nature but names the likely rules + the exact fix approach and the exit-0 acceptance — not a vague placeholder.
 
-**Type/consistency:** New scripts `typecheck`/`lint` referenced consistently in Tasks 1, 2, 4, 6. Sentry env var names (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`) consistent across Tasks 4 and 6 and `.env.example`. The entries-route edit targets the exact existing parse-failure branch (verified present at `src/app/api/entries/route.ts`). `withSentryConfig` options kept minimal so the build stays secret-free (matches the Global Constraint and the spec's "build succeeds with DSN unset").
+**Type/consistency:** New scripts `typecheck`/`lint` referenced consistently in Tasks 1, 2, 4, 6. Sentry env var names (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`) consistent across Tasks 4 and 6 and `.env.example`. The entries-route edit targets the exact existing parse-failure branch (verified present at `src/app/api/entries/route.ts`). `withSentryConfig` options kept minimal so the build stays secret-free.
+
+**Independent plan-review incorporated (2026-07-02):** the reviewer flagged three Task-4 defects, now fixed inline — (1) client init file renamed `sentry.client.config.ts` → `instrumentation-client.ts` (v10 convention); (2) `experimental: { instrumentationHook: true }` added to `next.config.mjs` so the server `instrumentation.ts` registers on Next 14.2.x; (3) `@sentry/nextjs` pinned to `^10`. Because both Sentry failure modes are *silent* (not build-breaking), acceptance for the Sentry piece is a **real `[parse-failure]` / test event reaching Sentry** in Task 6 Step 4, not merely a green build.
