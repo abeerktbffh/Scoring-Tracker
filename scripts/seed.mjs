@@ -14,8 +14,9 @@ const games = [
   ["queens", "Queens", "timed", "lower_better", "queens", false],
   ["tango", "Tango", "timed", "lower_better", "tango", false],
   ["mini-sudoku", "Mini Sudoku", "timed", "lower_better", "mini-sudoku", false],
+  ["strands", "Strands", "outcome", "lower_better", "strands", false],
+  ["india-mini", "India Mini", "timed", "lower_better", "india-mini", false],
   // Manual-only for now (no parser yet) — still fully loggable via manual entry.
-  ["strands", "Strands", "outcome", "lower_better", null, false],
   ["nyt-mini", "NYT Mini", "timed", "lower_better", null, false],
   ["zip", "Zip", "timed", "lower_better", null, false],
   ["crossclimb", "Crossclimb", "timed", "lower_better", null, false],
@@ -28,5 +29,9 @@ for (const [id, name, type, dir, parserId, hasVariants] of games) {
     VALUES (${id}, 'g1', ${name}, ${type}, ${dir}, ${parserId}, ${hasVariants})
     ON CONFLICT (id) DO NOTHING`;
 }
+
+// Backfill parser_id for games that existed before their parser was added
+// (ON CONFLICT above won't update an existing row). Metadata only.
+await sql`UPDATE games SET parser_id = 'strands' WHERE id = 'strands' AND group_id = 'g1'`;
 
 console.log(`Seed complete (${games.length} games).`);
