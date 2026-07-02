@@ -10,6 +10,10 @@
 
 ## Global Constraints
 
+- **Product name: "Bragboard"** (decided 2026-07-02). Use it for the brand wordmark, the browser
+  `<title>`, and the PWA manifest `name`/`short_name`. The mockups say "Scoring Tracker" — that was
+  the placeholder; render **Bragboard** instead. The deploy URL stays `scoring-tracker.vercel.app`
+  for now (cosmetic rename only, out of scope here).
 - **No DB schema changes.** Exactly ONE new API route is allowed: `GET /api/me?player=<displayName>` (read-only). All other endpoints under `src/app/api/**` are reused unchanged. Do NOT modify `src/parsers/**`, `src/db/**`, or `src/scoring/**` domain logic (import and reuse them).
 - **Secret-free build must stay green** (lazy DB client; Sentry no-ops without DSN). The workstream-A CI `verify` job (typecheck → lint → test → build) must pass.
 - **Keep the existing 120 tests green.** New tests are additive.
@@ -139,7 +143,7 @@ import { THEME_PREPAINT } from "@/design/theme";
 const display = Fraunces({ subsets: ["latin"], weight: ["400","600"], variable: "--font-display", display: "swap" });
 const ui = Inter({ subsets: ["latin"], weight: ["400","600","700"], variable: "--font-ui", display: "swap" });
 
-export const metadata: Metadata = { title: "Scoring Tracker", description: "Your group's daily puzzle standings." };
+export const metadata: Metadata = { title: "Bragboard", description: "Your group's daily puzzle standings." };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -422,7 +426,7 @@ describe("computeMe", () => {
 
 **Interfaces:** Produces an installable PWA with an offline app-shell. SW: cache the shell + static assets on install (cache-first for static, network-first for `/api/*` — never cache API). Offline navigation falls back to a cached shell page showing an "offline" notice.
 
-- [ ] **Step 1:** Add `manifest.webmanifest` (name "Scoring Tracker", short_name "Scoring", `display:standalone`, `start_url:"/"`, theme/background from tokens, the icon set). Generate icons from the 4-tile logo mark (pine tiles on paper) — a simple square PNG set at 192/512 + maskable + apple-touch.
+- [ ] **Step 1:** Add `manifest.webmanifest` (name "Bragboard", short_name "Bragboard", `display:standalone`, `start_url:"/"`, theme/background from tokens, the icon set). Generate icons from the 4-tile logo mark (pine tiles on paper) — a simple square PNG set at 192/512 + maskable + apple-touch.
 - [ ] **Step 2:** Add `<link rel="manifest">`, `apple-mobile-web-app-*` metas, and `apple-touch-icon` in `layout.tsx` `<head>`.
 - [ ] **Step 3:** Write `public/sw.js`: `install` precaches `/`, offline fallback, and build assets; `fetch` handler = network-first for `/api/`, cache-first for same-origin static, navigation fallback to cached shell when offline.
 - [ ] **Step 4:** `ServiceWorkerRegister` registers `/sw.js` on load (guarded by `"serviceWorker" in navigator`); mount in the app layout.
