@@ -39,6 +39,10 @@ export async function POST(req: Request) {
         "[parse-failure] " + (body.rawInput as string).slice(0, 120),
         "warning",
       );
+      // Serverless functions can freeze on return before Sentry finishes
+      // sending. Flush so the event actually leaves before we respond.
+      // No-ops instantly when no DSN is configured (local/CI).
+      await Sentry.flush(2000);
     }
     return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }
