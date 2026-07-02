@@ -8,7 +8,9 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.4",
@@ -20,6 +22,8 @@
   "devDependencies": {
     "@types/node": "^20.14.11",
     "@types/react": "^18.3.3",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.35",
     "typescript": "^5.5.3",
     "vitest": "^2.0.4"
   }
