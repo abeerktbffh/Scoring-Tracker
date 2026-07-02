@@ -28,3 +28,7 @@ export function makeLinkedInTimedParser(gameId: string, displayName: string): Pa
 export const queensParser = makeLinkedInTimedParser("queens", "Queens");
 export const tangoParser = makeLinkedInTimedParser("tango", "Tango");
 export const miniSudokuParser = makeLinkedInTimedParser("mini-sudoku", "Mini Sudoku");
+export const zipParser = makeLinkedInTimedParser("zip", "Zip");
+export const crossclimbParser = makeLinkedInTimedParser("crossclimb", "Crossclimb");
+export const patchesParser = makeLinkedInTimedParser("patches", "Patches");
+export const wendParser = makeLinkedInTimedParser("wend", "Wend");

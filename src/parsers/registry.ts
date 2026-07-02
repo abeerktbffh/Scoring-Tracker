@@ -3,9 +3,13 @@ import { wordleParser } from "./wordle";
 import { pipsParser } from "./pips";
 import { connectionsParser } from "./connections";
 import { minuteCrypticParser } from "./minuteCryptic";
-import { queensParser, tangoParser, miniSudokuParser } from "./linkedin";
+import {
+  queensParser, tangoParser, miniSudokuParser,
+  zipParser, crossclimbParser, patchesParser, wendParser,
+} from "./linkedin";
 import { strandsParser } from "./strands";
 import { indiaMiniParser } from "./indiaMini";
+import { pinpointParser } from "./pinpoint";
 
 export const parsers: Parser[] = [
   wordleParser,
@@ -15,6 +19,11 @@ export const parsers: Parser[] = [
   queensParser,
   tangoParser,
   miniSudokuParser,
+  zipParser,
+  crossclimbParser,
+  patchesParser,
+  wendParser,
+  pinpointParser,
   strandsParser,
   indiaMiniParser,
 ];
