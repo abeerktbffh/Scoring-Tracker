@@ -50,8 +50,13 @@ surface — the foundation the multi-group / UX / auto-import workstreams build 
 
 ### 5. Dependabot + audit
 - `.github/dependabot.yml`: npm ecosystem, directory `/`, weekly schedule.
-- Run `npm audit fix` and resolve the known advisories; verify tests + build still pass.
-  If a fix requires a breaking major bump, note it and leave that one for a separate PR.
+- Run `npm audit fix` for the **safely-fixable** advisories; verify tests + build still pass.
+- **Explicitly deferred (owner decision, 2026-07-02):** a **high/critical advisory in the
+  current Next.js (14.2.x)** whose only fix is a **breaking major upgrade**. This workstream
+  does **not** resolve it; it is tracked as a named near-term follow-up in the roadmap
+  ("Tech-debt / security follow-ups"). Acceptable interim because the app holds no sensitive
+  data (display names + puzzle scores) and DB credentials are server-side only — but it is a
+  conscious "yes, later," not a silent omission.
 
 ### 6. Branch protection *(user config — my token lacks repo-admin)*
 - GitHub → repo → Settings → Branches → add rule for `main`:
@@ -65,7 +70,9 @@ surface — the foundation the multi-group / UX / auto-import workstreams build 
   without explicit in-the-moment go-ahead; cleanup deletes only named players; Neon PITR
   is the safety net); env/DB layout (prod vs. `preview` Neon branch); and AI-friendly
   conventions (small focused files, tests as the objective gate, real-sample evals for
-  parsers, lazy DB client so builds stay env-free).
+  parsers, lazy DB client so builds stay env-free). Include a one-line **escape hatch**:
+  if branch protection ever wrongly blocks a legitimate merge, a repo admin can temporarily
+  disable the rule, merge, and re-enable it.
 
 ### 8. Independent Reviewer role — plain-language governance
 - **Why:** the owner is non-technical and steers the work; they must be able to govern it
@@ -96,7 +103,8 @@ surface — the foundation the multi-group / UX / auto-import workstreams build 
   deliberately-unparseable paste on preview produces a `[parse-failure]` alert.
 - Build still succeeds with the Sentry DSN unset (secret-free CI preserved).
 
-## Out of scope (deferred)
+## Out of scope (deferred — tracked in the roadmap's "Tech-debt / security follow-ups")
+- **Next.js major upgrade** to clear the high/critical advisory (§5) — near-term follow-up.
+- **Uptime monitoring** (a "is the site reachable" ping) — revisit as multi-group nears.
 - Sentry source-map upload, performance tracing/session replay.
-- Uptime pinging beyond Sentry (can add a simple monitor later).
 - Any product feature (belongs to workstreams B–F).

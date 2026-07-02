@@ -64,6 +64,13 @@ own `spec → plan → subagent-driven build` cycle.
 - **Depends on:** varies; notifications pair with B (PWA push) and C.
 - **Size:** many small pieces pulled as we go. **Open questions:** notification channel (PWA push vs. email); which engagement mechanic first.
 
+### Tech-debt / security follow-ups (tracked)
+- **Next.js major upgrade** — clears a **high/critical dependency advisory** in the current
+  14.2.x (surfaced by the Dev Foundation review, 2026-07-02). Fix is a breaking major upgrade,
+  so it gets its own spec → plan → heavily-tested build. **Priority: near-term** (target: soon
+  after workstream A). Interim risk accepted: no sensitive data, server-side DB creds only.
+- **Uptime monitoring** — a simple "is the site reachable" check; add as multi-group (C) nears.
+
 ## Sequence & rationale
 
 **A → B → C**, with **D** sliding in wherever convenient (self-contained) and **E** last (hardest; wants the foundation + auth in place). **F** is a continuous backlog.
