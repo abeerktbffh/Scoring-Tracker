@@ -1,0 +1,17 @@
+.chip {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-pill);
+  background: var(--tile-empty);
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.active {
+  background: var(--accent);
+  color: var(--surface);
+}

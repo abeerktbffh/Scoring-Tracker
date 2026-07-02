@@ -1,0 +1,26 @@
+.tile {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-tile);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.tile[data-state="solved"] {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.tile[data-state="partial"] {
+  background: var(--accent-2);
+  color: var(--surface);
+}
+
+.tile[data-state="empty"] {
+  background: var(--tile-empty);
+  color: var(--muted);
+}
