@@ -54,9 +54,10 @@ export function Drawer({ open, onClose, theme, setTheme }: DrawerProps): JSX.Ele
           </button>
         </div>
 
-        <button type="button" className={[styles.item, styles.signOut].join(" ")}>
-          Sign out
-        </button>
+        {/* Sign out is intentionally omitted: group_token is httpOnly, so it
+            cannot be cleared from client JS, and adding a logout API route is
+            out of scope for this workstream. Real sign-out lands with the
+            upcoming identity-rebuild sub-project. */}
       </div>
     </>
   );

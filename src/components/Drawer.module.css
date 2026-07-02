@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 30;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--scrim);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -82,9 +82,4 @@
 
 .themeToggle {
   font-size: 18px;
-}
-
-.signOut {
-  margin-top: auto;
-  color: var(--accent-2);
 }

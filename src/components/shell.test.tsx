@@ -62,10 +62,10 @@ describe("TabBar", () => {
 });
 
 describe("Drawer", () => {
-  it("shows Sign out and a theme toggle when open", () => {
+  it("does not show a Sign out control, but shows a theme toggle when open", () => {
     render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
 
-    expect(screen.getByText(/sign out/i)).toBeTruthy();
+    expect(screen.queryByText(/sign out/i)).toBeNull();
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
   });
 

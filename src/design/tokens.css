@@ -24,6 +24,7 @@
   --r-pill: 99px;
 
   --shadow-card: 0 1px 2px rgba(26, 23, 16, 0.06), 0 8px 24px rgba(26, 23, 16, 0.08);
+  --scrim: rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] {
@@ -38,4 +39,5 @@
   --me-bg: #16302b;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(0, 0, 0, 0.6);
 }
