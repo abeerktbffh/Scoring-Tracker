@@ -61,15 +61,31 @@ surface — the foundation the multi-group / UX / auto-import workstreams build 
 
 ### 7. `AGENTS.md` — codified workflow
 - Document: the loop (spec → plan → subagent-driven TDD → preview → PR → merge); the
-  **DB-safety rule** (no destructive database ops without explicit in-the-moment go-ahead;
-  cleanup deletes only named players; Neon PITR is the safety net); env/DB layout
-  (prod vs. `preview` Neon branch); and AI-friendly conventions (small focused files,
-  tests as the objective gate, real-sample evals for parsers, lazy DB client so builds
-  stay env-free).
+  **independent-review gate** (§8); the **DB-safety rule** (no destructive database ops
+  without explicit in-the-moment go-ahead; cleanup deletes only named players; Neon PITR
+  is the safety net); env/DB layout (prod vs. `preview` Neon branch); and AI-friendly
+  conventions (small focused files, tests as the objective gate, real-sample evals for
+  parsers, lazy DB client so builds stay env-free).
+
+### 8. Independent Reviewer role — plain-language governance
+- **Why:** the owner is non-technical and steers the work; they must be able to govern it
+  without reading code. This is the human-in-the-loop mechanism for AI-driven development.
+- **What:** a standing role, **separate from the builder**. At **every gate — the design
+  spec, the implementation plan, and each PR's code** — a **fresh reviewer agent**
+  (independent context; not the agent that produced the work) reviews it and produces:
+  1. a **plain-language report for the owner** — what it is, whether it's correct and safe,
+     risks in business terms, and a clear **✅ approve / ⚠️ hold** recommendation, no jargon; and
+  2. the **technical findings posted on the PR** (code gate) for the record.
+- **The owner approves on the plain-language verdict, not the code.** Only ✅ (or resolved
+  ⚠️) proceeds to the next gate.
+- This gate is required and codified in `AGENTS.md`. It is process, not a code artifact —
+  it applies to this workstream and all future ones.
 
 ## Code vs. user-config split
 - **I build:** CI workflow, ESLint config + fixes, Sentry SDK integration + drift alert,
   `dependabot.yml`, audit fixes, `AGENTS.md`, new npm scripts.
+- **I orchestrate (process, §8):** the independent-review gate — dispatch a fresh reviewer
+  agent at each spec/plan/code gate and deliver you the plain-language report + PR record.
 - **You do (guided):** create the Sentry project + set its DSN in Vercel; enable branch
   protection on `main` in GitHub settings.
 
