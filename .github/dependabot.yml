@@ -5,6 +5,23 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Framework-locked packages: their major upgrades are coupled (Next 15/16
+    # needs React 19 + ESLint 9 flat config) and are handled deliberately as the
+    # tracked "Next.js major upgrade" workstream, not as automatic PRs.
+    # @types/node major must track the Node 20 runtime (.nvmrc), not float ahead.
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
