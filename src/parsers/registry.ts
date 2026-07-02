@@ -4,6 +4,8 @@ import { pipsParser } from "./pips";
 import { connectionsParser } from "./connections";
 import { minuteCrypticParser } from "./minuteCryptic";
 import { queensParser, tangoParser, miniSudokuParser } from "./linkedin";
+import { strandsParser } from "./strands";
+import { indiaMiniParser } from "./indiaMini";
 
 export const parsers: Parser[] = [
   wordleParser,
@@ -13,6 +15,8 @@ export const parsers: Parser[] = [
   queensParser,
   tangoParser,
   miniSudokuParser,
+  strandsParser,
+  indiaMiniParser,
 ];
 
 export function detectAndParse(
