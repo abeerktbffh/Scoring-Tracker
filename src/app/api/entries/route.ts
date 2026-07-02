@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 import { sql } from "@/db/client";
 import { verifyGroupToken } from "@/auth/token";
 import { hashSecret, verifySecret } from "@/auth/hash";
@@ -34,6 +35,10 @@ export async function POST(req: Request) {
     if (typeof body.rawInput === "string" && resolved.status === 422) {
       // Surface parser drift: a share text we failed to recognize.
       console.warn("[parse-failure]", body.rawInput.slice(0, 120));
+      Sentry.captureMessage(
+        "[parse-failure] " + (body.rawInput as string).slice(0, 120),
+        "warning",
+      );
     }
     return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }
