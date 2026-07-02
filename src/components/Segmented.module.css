@@ -1,0 +1,28 @@
+.seg {
+  display: flex;
+  background: var(--tile-empty);
+  border-radius: var(--r-tile);
+  padding: 3px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  gap: 2px;
+}
+
+.option {
+  flex: 1;
+  text-align: center;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--r-tile);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.option.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
