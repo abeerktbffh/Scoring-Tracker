@@ -5,3 +5,6 @@ node_modules
 next-env.d.ts
 .DS_Store
 .superpowers/
+
+# Reference implementations for workstream D (offline games) — not part of the app build
+Offline Games/
