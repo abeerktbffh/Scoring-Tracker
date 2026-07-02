@@ -7,7 +7,19 @@ import { THEME_PREPAINT } from "@/design/theme";
 const display = Fraunces({ subsets: ["latin"], weight: ["400","600"], variable: "--font-display", display: "swap" });
 const ui = Inter({ subsets: ["latin"], weight: ["400","600","700"], variable: "--font-ui", display: "swap" });
 
-export const metadata: Metadata = { title: "Bragboard", description: "Your group's daily puzzle standings." };
+export const metadata: Metadata = {
+  title: "Bragboard",
+  description: "Your group's daily puzzle standings.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Bragboard",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
