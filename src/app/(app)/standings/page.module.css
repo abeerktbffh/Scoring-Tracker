@@ -1,0 +1,114 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pageTitle {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sectionTitle {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.chipRow {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.boardTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-display);
+}
+
+.boardHeaderRow {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.boardHeaderCell {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+}
+
+.boardHeaderCell:last-child,
+.boardHeaderCell:nth-child(3),
+.boardHeaderCell:nth-child(4) {
+  text-align: right;
+}
+
+.boardRow {
+  border-bottom: 1px solid var(--line);
+}
+
+.boardRow:last-child {
+  border-bottom: none;
+}
+
+.me {
+  background: var(--me-bg);
+  font-weight: 700;
+}
+
+.rankCell {
+  width: 16px;
+  padding: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.me .rankCell {
+  color: var(--accent);
+}
+
+.nameCell {
+  padding: var(--space-2);
+  font-size: 15px;
+}
+
+.statCell {
+  padding: var(--space-2);
+  text-align: right;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.me .statCell {
+  color: var(--accent);
+}
+
+.streakCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--accent-2);
+}
