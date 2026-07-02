@@ -41,10 +41,30 @@ shell that replaces the single-file `tracker.tsx`.
 
 ## Global constraints
 
-- **No backend/API/schema changes.** Reuse `GET /api/games`, `GET /api/leaderboard`,
-  `GET /api/games/:id/board`, `GET /api/players`, `POST /api/auth`, `POST /api/entries`,
-  `POST /api/admin/*`. If a screen wants data the API doesn't return, either derive it client-side
-  or note it as out-of-scope — do not change the API in this workstream.
+- **No schema changes; one additive read-only endpoint allowed.** Reuse `GET /api/games`,
+  `GET /api/leaderboard`, `GET /api/games/:id/board`, `GET /api/players`, `POST /api/auth`,
+  `POST /api/entries`, `POST /api/admin/*` unchanged. The Home "N of M logged today" + tile row and
+  the You screen's per-game streaks and recent history need per-user data none of those expose, so
+  this workstream adds **one** new read-only endpoint, **`GET /api/me?player=<displayName>`**
+  (decision 2026-07-02) — no writes, no schema change. No other API/schema change is in scope.
+
+### New endpoint: `GET /api/me?player=<displayName>`
+Read-only. Group from the `group_token` cookie (401 if absent), viewer by the `player` display-name
+query param (same honor-system pattern as the existing `player` param — reads are group-shared,
+per-user PIN only guards writes). Returns, computed from existing tables via existing scoring helpers:
+```json
+{
+  "today": { "date": "2026-07-02", "loggedCount": 3, "totalCount": 5,
+             "games": [ { "gameId": "wordle", "name": "Wordle", "logged": true }, … ] },
+  "streaks": [ { "gameId": "wordle", "name": "Wordle", "currentStreak": 7, "longestStreak": 12 }, … ],
+  "recent":  [ { "gameId": "wordle", "name": "Wordle", "variant": null, "value": 3,
+                 "solved": true, "puzzleDate": "2026-07-02" }, … ]  // most-recent first, capped at 10
+}
+```
+`today.games` lists the group's **active** games with whether the viewer logged each **today**;
+`streaks` are per game for the viewer (reusing the existing streak computation); `recent` is the
+viewer's last 10 on-time active entries, newest first. Overall wins/win-rate/rank continue to come
+from `GET /api/leaderboard` (the viewer's own row), not from `/api/me`.
 - **Keep the 120-test suite green.** Parser/logic tests are unaffected; add component tests for new
   UI where they carry weight.
 - **Secret-free build preserved** (lazy DB client, Sentry no-ops without DSN) — the CI gate from
