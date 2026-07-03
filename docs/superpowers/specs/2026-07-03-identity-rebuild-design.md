@@ -45,6 +45,14 @@ Sign out control pending this workstream.
   (no approval needed — a fresh player has no pre-existing history to protect).
 - **Admin:** a **per-person admin role** (a flag on the member record) replaces the shared
   admin passphrase. The owner is the initial admin.
+- **Admin join-notification (permanent):** the admin is **emailed every time a player joins the
+  group** — both when a claim is approved during migration AND, ongoing forever, whenever a new
+  friend creates a fresh player. This is informational (not an approval gate) and persists after
+  migration. Uses the same email provider.
+- **Claim approval is migration-only (transitional):** the approve/reject workflow exists **only
+  while unclaimed legacy players remain** (the migration window). It self-retires with the claim
+  step; after migration there is **no approval** — invited friends create a fresh player directly
+  and the admin is simply notified (per the bullet above).
 - **Logging a score:** attributed to the **logged-in user's player** — **no more display_name +
   PIN** on entry submission. The PIN concept is removed.
 - **Sign-out:** real sign-out via Auth.js (clears the session); the drawer Sign out item returns, functional.
@@ -112,7 +120,9 @@ the existing `sql` client) is a plan-level choice; it must work with the Neon se
   practical (the no-peek `player` param can be resolved from the session).
 - **Added:** Auth.js route(s) (`/api/auth/[...nextauth]` or App Router handler), the sign-in
   screen, the invite redeem + "need an invite" screens, the claim/create onboarding, email
-  templates (verification + reset), admin invite generation + claim reassignment/archive.
+  templates (verification + reset + **admin "new player joined" notification**), admin invite
+  generation + the (migration-only) claim approval queue + claim reassignment/archive, and the
+  server-side hook that emails the admin whenever a player joins.
 
 ## Migration & rollout
 
