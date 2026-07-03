@@ -130,9 +130,11 @@ the existing `sql` client) is a plan-level choice; it must work with the Neon se
 - Auth.js owns OAuth state/PKCE, session signing, CSRF. Secrets (`AUTH_SECRET` already present;
   Google client id/secret; email provider key) are server-side env only; **build stays
   secret-free** (Auth.js no-ops/guards when unset so CI/build need no secrets).
-- Invite tokens are unguessable, expiring, and revocable. Email verification prevents typo/fake
-  accounts. Passwords hashed with the existing scrypt (`src/auth/hash.ts`) or Auth.js's
-  recommended hashing — chosen at plan time; never stored plaintext.
+- Email verification prevents typo/fake accounts; passwords never stored plaintext.
+- **The binding security requirements are the "Security decisions" section below** (claim
+  authorization, account linking, invite/token hardening, DB-source-of-truth, server-side authz,
+  hashing params, migration ordering). The plan MUST implement that section; this paragraph is
+  only an overview.
 - Independent **security-focused review** at spec, plan, and PR gates (the standing Reviewer role).
 
 ## Security decisions — resolving the spec-review conditions (2026-07-03)
