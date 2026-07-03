@@ -154,12 +154,20 @@ binding resolution (the plan MUST implement these):
 
 - **[Critical] Claim authorization.** Resolved above: claims are **admin-approved & pending**;
   no history transfers until approval; audited + reversible. An invite never itself proves identity.
-- **[Important] Account linking / dual identity.** A person using both Google and email+password
-  must resolve to **one** `user`. **Auto-link accounts only on a matching, provably-verified email
-  on both sides** (Google emails are verified; email/password only after our verification step);
-  never auto-link on an unverified email (avoids the known Auth.js account-linking hijack).
-  Enforce **one player per (user, group)** so a user cannot end up with two players in `g1`
-  (`UNIQUE (group_id, user_id) WHERE user_id IS NOT NULL`).
+- **[Important] One login method per email (no cross-method linking) — decision revised 2026-07-03.**
+  Each email address is bound to **exactly one** login method — whichever was used first. We do
+  **not** auto-link Google and email/password into one account (that linking is the classic hijack
+  surface and is disproportionate for a 4-5 person group). Enforcement:
+  - `allowDangerousEmailAccountLinking: false` (Auth.js never blind-links).
+  - A **Google** sign-in whose email already belongs to a **credentials** user (has `password_hash`)
+    is **rejected** with a clear message ("this email already signs in with a password — use that").
+  - A **credentials registration** for an email that already exists (Google or credentials) is
+    **rejected** with a clear message ("this email is already registered — sign in instead").
+  - New **Google** users are created **email-verified** (Google emails are provider-verified) so
+    `createUser` sets `email_verified` from the profile.
+  - Still enforce **one player per (user, group)**: `UNIQUE (group_id, user_id) WHERE user_id IS NOT NULL`.
+  Trade-off (accepted): a person cannot use both methods interchangeably for one email; they use
+  whichever they signed up with. Removes the entire linking attack surface.
 - **[Important] Invite lifecycle.** Invite tokens are **cryptographically random**, stored
   **hashed** (looked up by hash, compared in constant time — never stored raw), with an
   **expiry (TTL)** and **revocable**. A shared multi-use invite is acceptable *because the

@@ -13,7 +13,7 @@
 - **DB is source of truth.** The session token carries ONLY `userId`. Membership (the user's `player` in `g1`) and `is_admin` are read from the DB on **every** privileged request — never trusted from the token.
 - **Server-side authorization on every mutating endpoint.** `POST /api/entries` and `POST /api/admin/*` each independently verify (a) authenticated session, (b) resolved `g1` membership, (c) `is_admin` for admin routes. **Entries are attributed to the server-resolved player; any client-supplied player id/displayName is ignored.** UI gating is cosmetic only.
 - **Claim authorization.** A claim of a legacy player is created **pending** and transfers **no history until an admin approves it**. Claims are audited (`claimed_by_user_id`, `claim_status`, `claimed_at`, `approved_by`) and reversible. An invite is a *join* gate, never proof of identity. Claim approval is **migration-only** — it exists only while unclaimed, unarchived legacy players remain, then self-retires.
-- **Account linking.** Auto-link a Google and an email/password login into ONE `user` **only on a matching, provably-verified email on both sides**; never on an unverified email. Enforce **one player per (user, group)**: `UNIQUE (group_id, user_id) WHERE user_id IS NOT NULL`.
+- **One login method per email (NO cross-method linking) — revised 2026-07-03.** `allowDangerousEmailAccountLinking:false`. A Google sign-in whose email already belongs to a **credentials** user (has `password_hash`) is **rejected** ("this email signs in with a password — use that"). A credentials **registration** for an already-existing email is **rejected** ("already registered — sign in"). New **Google** users are created **email-verified** (`createUser` sets `email_verified` from the Google profile). Enforce **one player per (user, group)**: `UNIQUE (group_id, user_id) WHERE user_id IS NOT NULL`. (No auto-linking = no linking attack surface.)
 - **Invite tokens** are cryptographically random, **stored hashed** (looked up by hash, constant-time compare, never stored raw), expiring (TTL) and revocable. Invite state never affects an already-joined account.
 - **Password hashing:** scrypt with EXPLICIT params `N=32768, r=8, p=1, keylen=64`, random 16-byte salt, `timingSafeEqual` compare. Never store plaintext.
 - **Verification & reset tokens:** single-use, short-TTL, invalidated on use; verification/reset **sends are rate-limited**; "forgot password" is **enumeration-safe** (identical response whether or not the email exists). CSRF handled within Auth.js routes.
@@ -123,6 +123,15 @@ CREATE TABLE IF NOT EXISTS invites (
   uses        INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- === Join eligibility (server-side proof that an authed user redeemed a valid invite) ===
+CREATE TABLE IF NOT EXISTS join_eligibility (
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  group_id   TEXT NOT NULL REFERENCES groups(id),
+  invite_id  TEXT REFERENCES invites(id),
+  expires_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (user_id, group_id)
+);
 ```
 
 - [ ] **Step 2: Verify statements are single-statement-safe** — Run: `node -e "const s=require('fs').readFileSync('src/db/schema.sql','utf8');const n=s.split(';').map(x=>x.trim()).filter(Boolean).length;console.log('statements:',n)"`. Expected: prints a count, no error (every statement is simple; no `$$`/`DO` blocks).
@@ -218,7 +227,7 @@ describe("invites", () => {
 **Interfaces — Consumes:** `sql` (`src/db/client.ts`), `newId` (`src/lib/ids.ts`). **Produces:** `NeonAdapter(): Adapter` implementing the methods Auth.js needs for JWT-session + Google + Credentials + email verification: `createUser, getUser, getUserByEmail, getUserByAccount, updateUser, linkAccount, createVerificationToken, useVerificationToken`. (No session methods — JWT strategy.) Plus pure row↔object mappers `rowToUser`, `rowToAccount` exported for testing.
 
 - [ ] **Step 1: Failing test** — unit-test the pure mappers (`rowToUser` maps snake_case DB row → Auth.js `AdapterUser` incl. `emailVerified` as Date|null; `rowToAccount` similar). These are the parts with mapping bugs; the sql calls are thin.
-- [ ] **Step 2: Run — FAIL.** **Step 3: Implement** the adapter: each method issues one `sql` query and maps via `rowToUser`/`rowToAccount`. `createUser` → INSERT into `users` returning the row. `getUserByAccount` → JOIN `accounts`. `linkAccount` → INSERT into `accounts`. `createVerificationToken`/`useVerificationToken` → the `verification_token` table (delete-on-use, return the row or null). Follow the Auth.js v5 `Adapter` type signatures exactly (import type from `@auth/core/adapters`).
+- [ ] **Step 2: Run — FAIL.** **Step 3: Implement** the adapter: each method issues one `sql` query and maps via `rowToUser`/`rowToAccount`. `createUser` → INSERT into `users` returning the row, **persisting `emailVerified`** as passed (Google users arrive pre-verified — see T5's Google `profile` mapping — so a Google-created user is stored with `email_verified` set; credentials users are created via T13 with `email_verified NULL` until they verify). `getUserByAccount` → JOIN `accounts`. `linkAccount` → INSERT into `accounts`. `createVerificationToken`/`useVerificationToken` → the `verification_token` table (delete-on-use, return the row or null). Follow the Auth.js v5 `Adapter` type signatures exactly (import type from `@auth/core/adapters`).
 - [ ] **Step 4: Run — PASS.** **Step 5: Commit** — `feat(auth): custom Auth.js adapter over Neon sql client`
 
 ---
@@ -243,10 +252,15 @@ const googleEnabled = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLI
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: NeonAdapter(),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },  // 30-day TTL
   trustHost: true,
   providers: [
-    ...(googleEnabled ? [Google({ allowDangerousEmailAccountLinking: false })] : []),
+    ...(googleEnabled ? [Google({
+      allowDangerousEmailAccountLinking: false,
+      // Google emails are provider-verified → mark the created user verified.
+      profile: (p) => ({ id: p.sub, name: p.name, email: p.email, image: p.picture,
+        emailVerified: p.email_verified ? new Date() : null } as any),
+    })] : []),
     Credentials({
       credentials: { email: {}, password: {} },
       authorize: async (c) => {
@@ -263,14 +277,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    // Verified-email account linking: only link Google→existing user if that user's email is verified.
+    // One method per email: a Google sign-in must NOT take over an email that already
+    // signs in with a password. (No linking — reject instead, with a clear message.)
     signIn: async ({ user, account }) => {
       if (account?.provider === "google") {
         const email = (user.email ?? "").toLowerCase();
         if (!email) return false;
-        const rows = (await sql`SELECT id, email_verified FROM users WHERE email = ${email}`) as any[];
+        const rows = (await sql`SELECT id, password_hash FROM users WHERE email = ${email}`) as any[];
         const existing = rows[0];
-        if (existing && !existing.email_verified) return false; // don't link onto an unverified local account
+        // Reject if a DISTINCT credentials account owns this email. (Auth.js has already
+        // resolved/created the Google user via the adapter; if a separate password user exists
+        // with the same email, refuse to proceed.)
+        if (existing && existing.password_hash && existing.id !== (user as any).id) {
+          return "/signin?error=email_uses_password"; // redirect to sign-in with a clear message
+        }
       }
       return true;
     },
@@ -288,7 +308,7 @@ import { handlers } from "@/auth/config";
 export const { GET, POST } = handlers;
 export const runtime = "nodejs";
 ```
-- [ ] **Step 4: Verify secret-free build** — Run: `rm -rf .next && mv .env.local .env.local.bak 2>/dev/null; npm run build; S=$?; mv .env.local.bak .env.local 2>/dev/null; echo exit:$S`. Expected: exit 0 (Google provider omitted when unset; Auth.js does not throw). Then `npm run typecheck && npm run lint && npm test` green.
+- [ ] **Step 4: Verify secret-free build** — Run: `rm -rf .next && mv .env.local .env.local.bak 2>/dev/null; npm run build; S=$?; mv .env.local.bak .env.local 2>/dev/null; echo exit:$S`. Expected: exit 0 (Google provider omitted when unset; Auth.js does not throw). Then `npm run typecheck && npm run lint && npm test` green. **If Auth.js v5 requires `AUTH_SECRET` at build time**, set a **dummy** `AUTH_SECRET` in CI (`.github/workflows/ci.yml`) — a build-only non-secret placeholder, NOT the real value — and note it; the real `AUTH_SECRET` stays a Vercel runtime env only. (`vitest.setup.ts` already provides a dummy for tests.)
 - [ ] **Step 5: Commit** — `feat(auth): Auth.js config (Google + Credentials, JWT session, verified-email linking) + route`
 
 ---
@@ -322,9 +342,14 @@ export const runtime = "nodejs";
 
 **Files:** Create `src/lib/claims.ts`, `src/lib/claims.test.ts`.
 
-**Interfaces — Produces:** `unclaimedLegacyPlayers(groupId): Promise<{id,displayName}[]>` (players with `user_id IS NULL AND archived = false`); `createPendingClaim(userId, playerId): Promise<{ ok: true } | { ok:false; reason }>` (rejects if the player is already claimed/archived, if a pending claim exists, or if the user already has a player in the group — one-player-per-user); `listPendingClaims(groupId)`; `approveClaim(claimId, adminUserId): Promise<{ playerName, userEmail }>` (sets `players.user_id`, locks, marks claim approved, records `approved_by`/`decided_at`); `rejectClaim(claimId, adminUserId)`; `archivePlayer(playerId, adminUserId)`; `createFreshPlayer(userId, groupId, displayName)`; `migrationActive(groupId): Promise<boolean>` (true iff unclaimed legacy players remain — drives whether the claim UI shows). Pure `canClaim(player, existingUserPlayer, pendingExists)` for testing.
+**Interfaces — Produces:** `unclaimedLegacyPlayers(groupId): Promise<{id,displayName}[]>` (players with `user_id IS NULL AND archived = false`); `createPendingClaim(userId, playerId): Promise<{ ok: true } | { ok:false; reason }>`; `listPendingClaims(groupId)`; `approveClaim(claimId, adminUserId): Promise<{ ok:true; playerName; userEmail } | { ok:false; reason }>`; `rejectClaim(claimId, adminUserId)`; `archivePlayer(playerId, adminUserId)`; `createFreshPlayer(userId, groupId, displayName)`; `migrationActive(groupId): Promise<boolean>` (true iff unclaimed, unarchived legacy players remain). Pure `canClaim(player, existingUserPlayer, pendingExists)` for testing.
 
-- [ ] **Step 1: Failing tests** (node) for the pure `canClaim`: archived player→no; already-linked player→no; user already has a player→no; pending claim exists→no; otherwise→yes. **Step 2: FAIL. Step 3: Implement** (guards enforce the one-player-per-user + locking invariants at the query level too, relying on the unique indexes from Task 1). **Step 4: PASS. Step 5: Commit** — `feat(auth): claim lifecycle (pending/approve/reject/archive) + fresh-player creation`
+**Concurrency (the Neon HTTP driver is stateless — no interactive `SELECT … FOR UPDATE`; use atomic conditional writes + DB constraints):**
+- `createPendingClaim` guards (application-level, backed by DB constraints): reject if the player has `user_id IS NOT NULL` or `archived=true`; reject if the `claims_one_pending_per_player` unique index would trip (a pending claim already exists — catch the violation → `reason:"already-pending"`); reject if the user already has ANY player in the group (`SELECT` + the `players_group_user_uq` index) → `reason:"already-member"`. Also reject a **second pending claim by the same user** (`SELECT count pending WHERE claimed_by_user_id=…` → `reason:"one-claim-at-a-time"`).
+- `approveClaim` performs the link as a **single atomic conditional UPDATE**, not a read-then-write:
+  `UPDATE players SET user_id = ${claim.claimed_by_user_id} WHERE id = ${claim.player_id} AND user_id IS NULL AND archived = false RETURNING id`.
+  If it returns **0 rows** → the player was already claimed/archived in a race → return `{ok:false, reason:"already-resolved"}` and do NOT mark the claim approved. If a `players_group_user_uq` unique violation is thrown (the user already holds a player) → catch → `{ok:false, reason:"already-member"}`. Only on a returned row: mark the claim `approved` (`approved_by`, `decided_at`) and return the player/email for the notification. This is atomic without interactive transactions.
+- [ ] **Step 1: Failing tests** (node) for the pure `canClaim`: archived→no; already-linked→no; user-already-has-player→no; pending-exists→no; otherwise→yes. **Step 2: FAIL. Step 3: Implement** the guards + the atomic conditional-UPDATE approve above. **Step 4: PASS. Step 5: Commit** — `feat(auth): claim lifecycle (atomic approve, one-claim-per-user) + fresh-player creation`
 
 ---
 
@@ -334,9 +359,9 @@ export const runtime = "nodejs";
 
 **Interfaces — Consumes:** invites (T3), claims (T8), membership (T7), email (T6), auth (T5). **Produces (all `runtime="nodejs"`):**
 - `POST /api/invites` — `requireAdmin`; body `{ttlMs?, maxUses?}` → `createInvite` → returns the raw token/link ONCE.
-- `POST /api/invites/redeem` — authed session required; body `{token}` → `validateInvite`; on ok, marks the session eligible to onboard (e.g. sets a short-lived signed "invited" cookie scoped to the group, or records eligibility) and `consumeInvite`. Invalid → 400 with the neutral reason.
-- `GET /api/onboarding` — authed; returns `{ needsInvite: boolean, migrationActive: boolean, unclaimed: [...], alreadyMember: boolean }` (viewer’s state, all DB-resolved).
-- `POST /api/onboarding` — authed + invite-eligible; body `{action:"claim", playerId}` → `createPendingClaim`; `{action:"create", displayName}` → `createFreshPlayer` + `sendAdminJoinNotification`. Claim does NOT notify until approved.
+- `POST /api/invites/redeem` — authed session required; body `{token}` → `validateInvite`; on ok, **UPSERT a `join_eligibility` row** for `(session.userId, groupId)` with `expires_at = now + 1h` and the `invite_id`, then `consumeInvite`. Invalid → 400 with the neutral reason. Eligibility is a **server-side DB record bound to the authenticated user + group** (not a cookie) — revocable and TTL'd.
+- `GET /api/onboarding` — authed; returns `{ needsInvite: boolean, migrationActive: boolean, unclaimed: [...], alreadyMember: boolean }`, all DB-resolved. `needsInvite = !alreadyMember && no unexpired join_eligibility row`.
+- `POST /api/onboarding` — authed; **server-side gate:** allowed only if the viewer is `alreadyMember` OR has an **unexpired `join_eligibility` row** for `g1` (re-checked here, never trusted from the client). Body `{action:"claim", playerId}` → `createPendingClaim`; `{action:"create", displayName}` → `createFreshPlayer` + `sendAdminJoinNotification` (and consume/clear the eligibility row on successful create). Reject (403) if neither member nor eligible. Claim does NOT notify until approved.
 
 - [ ] Steps: write route logic reusing the libs; test the request→lib wiring where practical (mock the libs) or defer behavioral coverage to the libs’ own tests + preview. Enforce authz on every route (`requireAdmin`/authed+eligible). Commit — `feat(api): invite + onboarding endpoints (invite-gated, admin-created invites)`
 
@@ -354,7 +379,8 @@ export const runtime = "nodejs";
 
 **Files:** Modify `src/app/api/entries/route.ts`; add/adjust its test.
 
-- Replace the `displayName`+`pin` guard with `requireMember()` → the server-resolved `player`. **Ignore any client-supplied player id/displayName.** Attribute the entry to `viewer.player.id`. Keep the parse/append-only logic and the Sentry parse-failure alert. 401 when unauthenticated, 403 when not a member. Commit — `feat(api): attribute entries to the session's player; drop name/PIN`
+- Replace the `displayName`+`pin` guard with `requireMember()` → the server-resolved `player`. **Ignore any client-supplied player id/displayName.** Attribute the entry to `viewer.player.id`. Keep the parse/append-only logic and the Sentry parse-failure alert. 401 when unauthenticated, 403 when not a member.
+- **Also update the read endpoints** `GET /api/leaderboard`, `GET /api/games/:id/board`, `GET /api/me` to derive the "viewer" (for no-peek + self-highlight) from the **session** (`resolveViewer`) instead of the `?player=` query param — the param is no longer trustworthy once identity exists. These are read paths (lower risk) but should use the session viewer for correctness. Commit — `feat(api): attribute entries + resolve read-viewer from the session; drop name/PIN`
 
 ---
 
@@ -368,9 +394,16 @@ export const runtime = "nodejs";
 
 ### Task 13: Verification & password-reset flows
 
-**Files:** Create `src/app/api/auth/register/route.ts` (email/password signup → create user (unverified) + send verification), `src/app/api/auth/verify/route.ts` (consume token → set `email_verified`), `src/app/api/auth/reset/route.ts` (request → enumeration-safe; and confirm → set new `password_hash`). Uses `verification_token` (single-use), `rateLimit`, `hashPassword`, `email.ts`.
+**Files:** Create `src/app/api/auth/register/route.ts`, `src/app/api/auth/verify/route.ts`, `src/app/api/auth/reset/route.ts`. Uses `verification_token` (single-use), `rateLimit` (T6), `hashPassword` (T2), `email.ts` (T6).
 
-- Enforce: single-use tokens (delete on use), short TTL (e.g. 30 min), rate-limited sends, enumeration-safe responses (identical success message whether or not the email exists). Commit — `feat(auth): email verification + enumeration-safe password reset`
+Precise requirements (security-critical — the reviewer will check each):
+- **register:** body `{email, password}`. **One-method-per-email:** if a user with that email already exists (Google OR credentials) → reject with a clear, generic message ("this email is already registered — sign in instead"). Otherwise create a `users` row with `password_hash` (T2) and `email_verified = NULL`, mint a **single-use** `verification_token` (`purpose='verify'`, TTL 30 min), and `sendVerificationEmail`. Rate-limit sends by **email AND client IP**.
+- **verify:** `{token}` → look up + **delete the token in the same operation** (single-use); if valid + unexpired → set `users.email_verified = now()`. Invalid/expired → generic error.
+- **reset request:** `{email}` → **enumeration-safe**: always return the same success response and do the **same work / timing** whether or not the email exists (if it exists AND is a credentials user, mint a `purpose='reset'` single-use token, TTL 30 min, and `sendPasswordResetEmail`). Rate-limit by email AND IP.
+- **reset confirm:** `{token, newPassword}` → validate the `reset` token, set the new `password_hash` (T2), and **delete the token** — as an atomic conditional update keyed on the still-valid token (0 rows affected → reject). Never reveal whether the email existed.
+- Keep these inside our own route handlers (CSRF: same-origin POST + Auth.js session where applicable); no token is ever returned in a response body — only emailed.
+
+Commit — `feat(auth): registration (one-method-per-email), single-use email verification, enumeration-safe password reset`
 
 ---
 
