@@ -1,29 +1,30 @@
 import "./globals.css";
+import "@/design/tokens.css";
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Space_Mono } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
+import { THEME_PREPAINT } from "@/design/theme";
 
-const display = Bricolage_Grotesque({
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const mono = Space_Mono({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-mono",
-  display: "swap",
-});
+const display = Fraunces({ subsets: ["latin"], weight: ["400","600"], variable: "--font-display", display: "swap" });
+const ui = Inter({ subsets: ["latin"], weight: ["400","600","700"], variable: "--font-ui", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Scoring Tracker",
+  title: "Bragboard",
   description: "Your group's daily puzzle standings.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Bragboard",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${ui.variable}`}>
+      <head><script dangerouslySetInnerHTML={{ __html: THEME_PREPAINT }} /></head>
       <body>{children}</body>
     </html>
   );

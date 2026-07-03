@@ -1,0 +1,92 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-display);
+}
+
+.headerRow {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.headerCell {
+  text-align: left;
+  padding: 0;
+}
+
+.headerCell:last-child,
+.headerCell:nth-child(3),
+.headerCell:nth-child(4) {
+  text-align: right;
+}
+
+.sortButton {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  width: 100%;
+}
+
+.headerCell:nth-child(3) .sortButton,
+.headerCell:nth-child(4) .sortButton,
+.headerCell:last-child .sortButton {
+  text-align: right;
+}
+
+.row {
+  border-bottom: 1px solid var(--line);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.me {
+  background: var(--me-bg);
+  font-weight: 700;
+}
+
+.rankCell {
+  width: 16px;
+  padding: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.me .rankCell {
+  color: var(--accent);
+}
+
+.nameCell {
+  padding: var(--space-2);
+  font-size: 15px;
+}
+
+.nameWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.crown {
+  color: var(--accent-2);
+}
+
+.statCell {
+  padding: var(--space-2);
+  text-align: right;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.me .statCell {
+  color: var(--accent);
+}

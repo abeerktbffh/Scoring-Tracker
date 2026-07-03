@@ -1,0 +1,26 @@
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--tile-empty) 25%,
+    var(--line) 50%,
+    var(--tile-empty) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

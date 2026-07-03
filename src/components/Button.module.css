@@ -1,0 +1,40 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-card);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.amber {
+  background: var(--accent-2);
+  color: var(--surface);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1.3px solid var(--line);
+}

@@ -1,0 +1,43 @@
+/* Bragboard design tokens — "Editorial Puzzle / Pine & Amber" (light + dark). */
+
+:root,
+[data-theme="light"] {
+  --bg: #fffdf7;
+  --surface: #ffffff;
+  --ink: #1a1710;
+  --muted: #8a7f66;
+  --line: #ddd0b6;
+  --accent: #10756a;
+  --accent-2: #e0952f;
+  --tile-empty: #efe9db;
+  --me-bg: #e2f0ed;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --r-tile: 4px;
+  --r-card: 16px;
+  --r-pill: 99px;
+
+  --shadow-card: 0 1px 2px rgba(26, 23, 16, 0.08), 0 8px 24px rgba(26, 23, 16, 0.12);
+  --scrim: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] {
+  --bg: #17150e;
+  --surface: #211e15;
+  --ink: #f2ecdd;
+  --muted: #a99a78;
+  --line: #3a3527;
+  --accent: #17a08f;
+  --accent-2: #e0952f;
+  --tile-empty: #2b271b;
+  --me-bg: #16302b;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
