@@ -31,12 +31,18 @@ Sign out control pending this workstream.
   (Google is pre-verified). Password reset via emailed link.
 - **Join gate:** a private **invite link/code**. Signing in without a valid invite lands on an
   "ask the owner for an invite" screen — no group access, no posting.
-- **Migration of existing friends:** **claim-on-first-login** — a signed-in, invited user with
-  no linked player sees "which of these is you?" listing **unclaimed legacy players**; claiming
-  links their account to that player and inherits its history. Claimed names **lock** (removed
-  from everyone's list). The claim step **only renders while unclaimed legacy players exist**;
-  once all are claimed it disappears permanently. Admin can reassign a claim or **archive** a
-  straggler legacy player to retire the step. New (non-legacy) joiners **create a fresh player**.
+- **Migration of existing friends:** **claim-on-first-login, admin-approved** — a signed-in,
+  invited user with no linked player sees "which of these is you?" listing **unclaimed legacy
+  players** and picks one. The claim is created **pending** and confers **no access to that
+  player's history until the admin approves it** (this is the authorization gate that prevents
+  claiming the wrong / someone else's identity — an invite is only a *join* gate, never proof of
+  identity). On approval, the account links to the player and inherits its history; the name
+  **locks** (removed from everyone's list). Claims are **audited** (`claimed_by_user_id`,
+  `claim_status` ∈ pending/approved/rejected, `claimed_at`, `approved_by`) and **reversible** by
+  admin. The claim step **only renders while unclaimed, unarchived legacy players exist**; once
+  all are claimed/archived it disappears permanently. Admin can reject/reassign a claim or
+  **archive** a straggler legacy player. New (non-legacy) joiners **create a fresh player**
+  (no approval needed — a fresh player has no pre-existing history to protect).
 - **Admin:** a **per-person admin role** (a flag on the member record) replaces the shared
   admin passphrase. The owner is the initial admin.
 - **Logging a score:** attributed to the **logged-in user's player** — **no more display_name +
@@ -54,17 +60,23 @@ or JWT-strategy sessions with no table — see below), and `verification_token` 
 verification + magic reset links). We do **not** hand-build these.
 
 We add/extend:
-- **`players`** (existing) gains **`user_id TEXT REFERENCES users(id)`** (nullable — a legacy
-  player is unclaimed until linked; a fresh player is created already linked). `pin_hash` becomes
-  nullable/deprecated (no longer used for auth) and is dropped once migration completes.
-  Keep `UNIQUE (group_id, display_name)`. A player represents **group membership** (a user's
-  participation in a group) — the row that C will generalize to memberships across groups.
-- **`players.is_admin BOOLEAN NOT NULL DEFAULT false`** — the per-person admin role (replaces
-  `groups.admin_passphrase_hash`, which is dropped).
-- **`invites`** (new): `id`/token, `group_id`, `created_by` (user_id), `expires_at`,
-  `max_uses`/`uses` (or single-use), `revoked`. Redeeming a valid invite authorizes the
-  signed-in user to join the group (reach claim/create).
-- **`groups.passphrase_hash`** is dropped (group-passphrase login retired).
+- **`players`** (existing) gains: **`user_id TEXT REFERENCES users(id)`** (nullable — a legacy
+  player is unclaimed until an *approved* claim links it; a fresh player is created already
+  linked); **`is_admin BOOLEAN NOT NULL DEFAULT false`** (per-person admin role, replaces the
+  shared admin passphrase); **`archived BOOLEAN NOT NULL DEFAULT false`** (straggler retirement /
+  drives the "unclaimed legacy" set). `pin_hash` → `DROP NOT NULL` in the additive migration,
+  dropped entirely at cutover. Keep `UNIQUE (group_id, display_name)`; **add `UNIQUE (group_id,
+  user_id) WHERE user_id IS NOT NULL`** (one player per person per group). A player represents
+  **group membership** — the row C generalizes to memberships across groups.
+- **`claims`** (new, or claim fields on a pending-link row): `player_id`, `claimed_by_user_id`,
+  `claim_status` ∈ (`pending`/`approved`/`rejected`), `claimed_at`, `approved_by`. Drives the
+  admin approval queue; a claim confers **no** history access until `approved`. Audited & reversible.
+- **`invites`** (new): `id`, `token_hash` (store the **hash**, not the raw token; look up by hash,
+  constant-time compare), `group_id`, `created_by` (user_id), `expires_at`, `revoked`,
+  optional `uses`/`max_uses`. A valid invite authorizes a signed-in user to reach claim/create
+  (join). Invite validity never affects an already-joined account.
+- **`groups.passphrase_hash`** and **`groups.admin_passphrase_hash`** are dropped (group-passphrase
+  and shared-admin-passphrase logins retired) — at cutover, after the new flow is verified.
 
 **Session strategy:** Auth.js **JWT session** (no session table) for serverless friendliness on
 Vercel; the session carries the `userId`, and the app resolves the user's group membership
@@ -76,8 +88,11 @@ the existing `sql` client) is a plan-level choice; it must work with the Neon se
 
 1. **Invited sign-in:** open invite link → Auth.js sign-in (Google or email/password) →
    invite validated → **onboarding**.
-2. **Onboarding:** if unclaimed legacy players exist → **claim** step (pick your name → link +
-   inherit history, or "I'm new" → create). If none → **create player** directly.
+2. **Onboarding:** if unclaimed legacy players exist → **claim** step (pick your name → a
+   **pending** claim is created; you're told it awaits owner approval and you get no history until
+   then — or choose "I'm new" → create a fresh player, no approval needed). If none → **create
+   player** directly. The **admin** sees a **claim approval queue** and approves/rejects each; on
+   approval the account links to the player and inherits its history.
 3. **Email/password signup:** create credentials → **verification email** → click link → verified →
    (with invite) onboarding. Unverified users cannot join/post.
 4. **Password reset:** "forgot password" → emailed reset link → set new password.
@@ -119,6 +134,52 @@ the existing `sql` client) is a plan-level choice; it must work with the Neon se
   accounts. Passwords hashed with the existing scrypt (`src/auth/hash.ts`) or Auth.js's
   recommended hashing — chosen at plan time; never stored plaintext.
 - Independent **security-focused review** at spec, plan, and PR gates (the standing Reviewer role).
+
+## Security decisions — resolving the spec-review conditions (2026-07-03)
+
+The independent security review returned APPROVED-WITH-CONDITIONS. Each finding and its
+binding resolution (the plan MUST implement these):
+
+- **[Critical] Claim authorization.** Resolved above: claims are **admin-approved & pending**;
+  no history transfers until approval; audited + reversible. An invite never itself proves identity.
+- **[Important] Account linking / dual identity.** A person using both Google and email+password
+  must resolve to **one** `user`. **Auto-link accounts only on a matching, provably-verified email
+  on both sides** (Google emails are verified; email/password only after our verification step);
+  never auto-link on an unverified email (avoids the known Auth.js account-linking hijack).
+  Enforce **one player per (user, group)** so a user cannot end up with two players in `g1`
+  (`UNIQUE (group_id, user_id) WHERE user_id IS NOT NULL`).
+- **[Important] Invite lifecycle.** Invite tokens are **cryptographically random**, stored
+  **hashed** (looked up by hash, compared in constant time — never stored raw), with an
+  **expiry (TTL)** and **revocable**. A shared multi-use invite is acceptable *because the
+  admin-approved claim is the real gate*. Redeeming an expired/revoked/exhausted invite shows a
+  neutral "ask the owner" screen and **never affects an already-joined account** (a joined user
+  stays joined regardless of invite state).
+- **[Important] DB is source of truth (JWT freshness).** The session token carries **only
+  `userId`**. **Membership and `is_admin` are read from the DB on every privileged request** —
+  never trusted from the token — so revoking admin/removing a member takes effect immediately.
+  Set a sane session TTL.
+- **[Important] Server-side authorization on every mutating endpoint.** `POST /api/entries` and
+  `POST /api/admin/*` each independently verify: (a) authenticated session, (b) the user's
+  resolved membership in `g1`, (c) `is_admin` for admin routes. **Entries are attributed to the
+  server-resolved player; any client-supplied player id is ignored.** UI gating is cosmetic only.
+- **[Important] Password hashing.** Reuse `src/auth/hash.ts` scrypt but set **explicit cost
+  parameters** (not Node defaults): `N=2^15 (32768)`, `r=8`, `p=1`, `keylen=64`, random 16-byte
+  salt, `timingSafeEqual` comparison (already present). (Or Auth.js's recommended credential
+  hashing — the plan picks one explicitly.) Confirm the exact Auth.js adapter + Credentials-provider
+  wiring at plan time.
+- **[Important] Verification & reset token hardening.** Verification and password-reset tokens are
+  **single-use, short-TTL, invalidated on use**; verification/reset **sends are rate-limited**;
+  the "forgot password" response is **enumeration-safe** (identical response whether or not the
+  email exists). Keep these inside Auth.js-managed routes where possible; any custom endpoint
+  inherits the same **CSRF** protection.
+- **[Minor] Migration ordering.** The **additive** migration must include `ALTER TABLE players
+  ALTER COLUMN pin_hash DROP NOT NULL` (so PIN-less fresh players can be inserted) and add a
+  **`players.archived BOOLEAN NOT NULL DEFAULT false`** flag (drives the "unclaimed legacy player"
+  set and straggler archiving). `groups.passphrase_hash`/`admin_passphrase_hash` are **dropped**
+  (not merely unused) in the cutover migration, sequenced after the new flow is verified.
+- **[Minor] Old auth cutover.** The old passphrase/PIN write path is **disabled in production the
+  moment the new session-based flow goes live** — not left running in parallel (no unauthenticated-
+  by-session bypass of the new gate).
 
 ## User config (guided, like Sentry)
 
