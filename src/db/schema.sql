@@ -51,3 +51,82 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS entries_active_idx
   ON entries (group_id, game_id, puzzle_date)
   WHERE superseded_by IS NULL;
+
+-- === Identity (Auth.js-compatible) ===
+CREATE TABLE IF NOT EXISTS users (
+  id             TEXT PRIMARY KEY,
+  name           TEXT,
+  email          TEXT UNIQUE,
+  email_verified TIMESTAMPTZ,
+  image          TEXT,
+  password_hash  TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id                  TEXT PRIMARY KEY,
+  user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type                TEXT NOT NULL,
+  provider            TEXT NOT NULL,
+  provider_account_id TEXT NOT NULL,
+  refresh_token       TEXT,
+  access_token        TEXT,
+  expires_at          BIGINT,
+  token_type          TEXT,
+  scope               TEXT,
+  id_token            TEXT,
+  session_state       TEXT,
+  UNIQUE (provider, provider_account_id)
+);
+
+CREATE TABLE IF NOT EXISTS verification_token (
+  identifier TEXT NOT NULL,
+  token      TEXT NOT NULL,
+  expires    TIMESTAMPTZ NOT NULL,
+  purpose    TEXT NOT NULL DEFAULT 'verify',
+  PRIMARY KEY (identifier, token)
+);
+
+-- === Players become memberships ===
+ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id);
+ALTER TABLE players ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE players ALTER COLUMN pin_hash DROP NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS players_group_user_uq
+  ON players (group_id, user_id) WHERE user_id IS NOT NULL;
+
+-- === Claims (migration-only, audited) ===
+CREATE TABLE IF NOT EXISTS claims (
+  id                 TEXT PRIMARY KEY,
+  group_id           TEXT NOT NULL REFERENCES groups(id),
+  player_id          TEXT NOT NULL REFERENCES players(id),
+  claimed_by_user_id TEXT NOT NULL REFERENCES users(id),
+  claim_status       TEXT NOT NULL DEFAULT 'pending' CHECK (claim_status IN ('pending','approved','rejected')),
+  claimed_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_by        TEXT REFERENCES users(id),
+  decided_at         TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS claims_one_pending_per_player
+  ON claims (player_id) WHERE claim_status = 'pending';
+
+-- === Invites (join gate; store token HASH only) ===
+CREATE TABLE IF NOT EXISTS invites (
+  id          TEXT PRIMARY KEY,
+  group_id    TEXT NOT NULL REFERENCES groups(id),
+  token_hash  TEXT NOT NULL UNIQUE,
+  created_by  TEXT REFERENCES users(id),
+  expires_at  TIMESTAMPTZ NOT NULL,
+  revoked     BOOLEAN NOT NULL DEFAULT false,
+  max_uses    INTEGER,
+  uses        INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- === Join eligibility (server-side proof that an authed user redeemed a valid invite) ===
+CREATE TABLE IF NOT EXISTS join_eligibility (
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  group_id   TEXT NOT NULL REFERENCES groups(id),
+  invite_id  TEXT REFERENCES invites(id),
+  expires_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (user_id, group_id)
+);
