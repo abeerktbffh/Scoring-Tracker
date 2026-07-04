@@ -54,24 +54,13 @@ describe("GET /api/onboarding", () => {
     expect(body.needsInvite).toBe(false);
   });
 
-  it("reports needsInvite=true for a non-member with no eligibility row", async () => {
+  it("reports needsInvite=false for a non-member (open join — no invite required)", async () => {
     authMock.mockResolvedValue({ user: { id: "u2" } });
     resolveViewerMock.mockResolvedValue({ userId: "u2", player: null, isAdmin: false });
-    sqlMock.mockResolvedValue([]); // no eligibility row
 
     const res = await GET();
     const body = await res.json();
     expect(body.alreadyMember).toBe(false);
-    expect(body.needsInvite).toBe(true);
-  });
-
-  it("reports needsInvite=false for a non-member with an unexpired eligibility row", async () => {
-    authMock.mockResolvedValue({ user: { id: "u3" } });
-    resolveViewerMock.mockResolvedValue({ userId: "u3", player: null, isAdmin: false });
-    sqlMock.mockResolvedValue([{ "?column?": 1 }]); // eligibility row present
-
-    const res = await GET();
-    const body = await res.json();
     expect(body.needsInvite).toBe(false);
   });
 
@@ -95,15 +84,16 @@ describe("POST /api/onboarding", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403s a non-member with no eligibility row, never reaching the libs", async () => {
+  it("lets any authenticated non-member create a player (open join, no invite/approval)", async () => {
     authMock.mockResolvedValue({ user: { id: "u5" } });
     resolveViewerMock.mockResolvedValue({ userId: "u5", player: null, isAdmin: false });
-    sqlMock.mockResolvedValue([]); // no eligibility
+    // create path: email lookup (no email) then clear-eligibility.
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    createFreshPlayerMock.mockResolvedValue({ id: "p20" });
 
     const res = await POST(jsonRequest({ action: "create", displayName: "Eve" }));
-    expect(res.status).toBe(403);
-    expect(createFreshPlayerMock).not.toHaveBeenCalled();
-    expect(createPendingClaimMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(createFreshPlayerMock).toHaveBeenCalledWith("u5", "g1", "Eve");
   });
 
   it("allows action=claim for an eligible non-member and calls createPendingClaim", async () => {
@@ -131,12 +121,11 @@ describe("POST /api/onboarding", () => {
     expect(body.error).toBe("already-member");
   });
 
-  it("allows action=create for an eligible non-member, sends notification, and clears eligibility", async () => {
+  it("action=create sends the admin notification and clears any eligibility", async () => {
     authMock.mockResolvedValue({ user: { id: "u8" } });
     resolveViewerMock.mockResolvedValue({ userId: "u8", player: null, isAdmin: false });
-    // First sql call = eligibility check, second = email lookup, third = clear eligibility.
+    // create path (no eligibility gate now): first sql = email lookup, second = clear eligibility.
     sqlMock
-      .mockResolvedValueOnce([{ "?column?": 1 }]) // eligible
       .mockResolvedValueOnce([{ email: "eve@example.com" }]) // user email lookup
       .mockResolvedValueOnce([]); // delete eligibility
     createFreshPlayerMock.mockResolvedValue({ id: "p10" });

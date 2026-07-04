@@ -9,19 +9,6 @@ export const runtime = "nodejs";
 
 const GROUP_ID = "g1";
 
-/**
- * True iff `userId` has an unexpired `join_eligibility` row for the group.
- * This is the server-side source of truth for "redeemed a valid invite" —
- * re-read from the DB on every call, never trusted from the client.
- */
-async function hasUnexpiredEligibility(userId: string): Promise<boolean> {
-  const rows = (await sql`
-    SELECT 1 FROM join_eligibility
-    WHERE user_id = ${userId} AND group_id = ${GROUP_ID} AND expires_at > now()
-  `) as unknown[];
-  return rows.length > 0;
-}
-
 async function clearEligibility(userId: string): Promise<void> {
   await sql`DELETE FROM join_eligibility WHERE user_id = ${userId} AND group_id = ${GROUP_ID}`;
 }
@@ -34,8 +21,9 @@ export async function GET() {
   const viewer = await resolveViewer();
   const alreadyMember = viewer?.player != null;
 
-  const eligible = alreadyMember ? true : await hasUnexpiredEligibility(userId);
-  const needsInvite = !alreadyMember && !eligible;
+  // Open join: any authenticated user may join by creating a player — no invite
+  // gate. (Legacy-player claiming is complete, so there's no history to protect.)
+  const needsInvite = false;
 
   const active = await migrationActive(GROUP_ID);
   const unclaimed = active ? await unclaimedLegacyPlayers(GROUP_ID) : [];
@@ -53,17 +41,9 @@ export async function POST(req: Request) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
-  const viewer = await resolveViewer();
-  const alreadyMember = viewer?.player != null;
-
-  // Server-side gate, re-checked here regardless of what the client claims.
-  if (!alreadyMember) {
-    const eligible = await hasUnexpiredEligibility(userId);
-    if (!eligible) {
-      return NextResponse.json({ error: "Not eligible to join" }, { status: 403 });
-    }
-  }
-
+  // Open join: any authenticated user may create a player and join — no invite
+  // gate. Identity is still the authenticated session; only the invite/approval
+  // requirement is removed.
   const body = (await req.json().catch(() => ({}))) as {
     action?: unknown;
     playerId?: unknown;
