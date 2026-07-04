@@ -107,3 +107,23 @@ describe("LeaderboardTable", () => {
     expect(onSort).toHaveBeenCalledWith("wins");
   });
 });
+
+describe("LeaderboardTable viewerRow", () => {
+  it("renders the viewer's row below a gap with their TRUE rank when outside the visible rows", () => {
+    const top = rows; // 3 visible rows (ranks 1-3)
+    render(
+      <LeaderboardTable
+        rows={top}
+        sortKey="wins"
+        onSort={() => {}}
+        me="Yuhnvee"
+        viewerRow={{ row: { displayName: "Yuhnvee", wins: 2, gamesPlayed: 5, winRate: 0.4 }, rank: 10 }}
+      />
+    );
+    // The viewer's name shows...
+    expect(screen.getByText("Yuhnvee")).toBeTruthy();
+    // ...with the TRUE rank 10, not a list-position rank like 4.
+    expect(screen.getByText("10")).toBeTruthy();
+    expect(screen.queryByText("4")).toBeNull();
+  });
+});

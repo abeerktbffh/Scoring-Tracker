@@ -90,3 +90,15 @@
 .me .statCell {
   color: var(--accent);
 }
+
+.gapRow {
+  border: none;
+}
+
+.gapCell {
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  letter-spacing: 2px;
+  padding: var(--space-1) 0;
+}

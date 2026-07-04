@@ -9,6 +9,12 @@ export interface LeaderboardTableProps {
   sortKey: LeaderboardSortKey;
   onSort: (key: LeaderboardSortKey) => void;
   me?: string;
+  /**
+   * Optional "your rank" row rendered below a visual gap, for when the viewer
+   * is outside the visible `rows` (e.g. top-5 shown, viewer is 10th). `rank` is
+   * the viewer's TRUE position, not derived from list index.
+   */
+  viewerRow?: { row: OverallRow; rank: number };
 }
 
 const COLUMNS: { key: LeaderboardSortKey; label: string }[] = [
@@ -17,7 +23,7 @@ const COLUMNS: { key: LeaderboardSortKey; label: string }[] = [
   { key: "winRate", label: "Win%" },
 ];
 
-export function LeaderboardTable({ rows, sortKey, onSort, me }: LeaderboardTableProps): JSX.Element {
+export function LeaderboardTable({ rows, sortKey, onSort, me, viewerRow }: LeaderboardTableProps): JSX.Element {
   return (
     <table className={styles.table}>
       <thead>
@@ -60,6 +66,24 @@ export function LeaderboardTable({ rows, sortKey, onSort, me }: LeaderboardTable
             </tr>
           );
         })}
+        {viewerRow && (
+          <>
+            <tr className={styles.gapRow} aria-hidden="true">
+              <td className={styles.gapCell} colSpan={5}>
+                ⋯
+              </td>
+            </tr>
+            <tr className={[styles.row, styles.me].join(" ")}>
+              <td className={styles.rankCell}>{viewerRow.rank}</td>
+              <td className={styles.nameCell}>
+                <span className={styles.nameWrap}>{viewerRow.row.displayName}</span>
+              </td>
+              <td className={styles.statCell}>{viewerRow.row.wins}</td>
+              <td className={styles.statCell}>{viewerRow.row.gamesPlayed}</td>
+              <td className={styles.statCell}>{Math.round(viewerRow.row.winRate * 100)}%</td>
+            </tr>
+          </>
+        )}
       </tbody>
     </table>
   );

@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import styles from "./page.module.css";
 
-const SNAPSHOT_SIZE = 4;
+const SNAPSHOT_SIZE = 5;
 
 type LoadState =
   | { status: "loading" }
@@ -112,14 +112,15 @@ function HomeReady({ me, rows, name, sortKey, onSort, onLog }: HomeReadyProps): 
   }
 
   const streak = bestCurrentStreak(me);
-  // Show the top players, but ALWAYS include the viewer's own row so you can see
-  // where you stand even if you're outside the top N (e.g. 5th of 5).
+  // Show the top N, and if the viewer is outside the top N, show their row below
+  // a gap with their TRUE rank so they can always see where they stand.
   const sorted = sortPlayers(rows, sortKey);
   const snapshot = sorted.slice(0, SNAPSHOT_SIZE);
-  if (name && !snapshot.some((r) => r.displayName === name)) {
-    const mine = sorted.find((r) => r.displayName === name);
-    if (mine) snapshot.push(mine);
-  }
+  const viewerIdx = name ? sorted.findIndex((r) => r.displayName === name) : -1;
+  const viewerRow =
+    viewerIdx >= SNAPSHOT_SIZE
+      ? { row: sorted[viewerIdx], rank: viewerIdx + 1 }
+      : undefined;
 
   return (
     <>
@@ -144,7 +145,7 @@ function HomeReady({ me, rows, name, sortKey, onSort, onLog }: HomeReadyProps): 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>This week</h2>
         <Card>
-          <LeaderboardTable rows={snapshot} sortKey={sortKey} onSort={onSort} me={name ?? undefined} />
+          <LeaderboardTable rows={snapshot} sortKey={sortKey} onSort={onSort} me={name ?? undefined} viewerRow={viewerRow} />
         </Card>
       </section>
     </>
