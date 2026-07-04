@@ -112,7 +112,14 @@ function HomeReady({ me, rows, name, sortKey, onSort, onLog }: HomeReadyProps): 
   }
 
   const streak = bestCurrentStreak(me);
-  const snapshot = sortPlayers(rows, sortKey).slice(0, SNAPSHOT_SIZE);
+  // Show the top players, but ALWAYS include the viewer's own row so you can see
+  // where you stand even if you're outside the top N (e.g. 5th of 5).
+  const sorted = sortPlayers(rows, sortKey);
+  const snapshot = sorted.slice(0, SNAPSHOT_SIZE);
+  if (name && !snapshot.some((r) => r.displayName === name)) {
+    const mine = sorted.find((r) => r.displayName === name);
+    if (mine) snapshot.push(mine);
+  }
 
   return (
     <>
