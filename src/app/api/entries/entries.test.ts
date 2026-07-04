@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const guardMock = vi.fn();
 const sqlMock = vi.fn();
@@ -131,5 +133,16 @@ describe("POST /api/entries", () => {
       .mockResolvedValueOnce([]); // insert retry
     const res = await POST(jsonRequest({ gameId: "wordle", value: 3, solved: true }));
     expect(res.status).toBe(200);
+  });
+
+  it("entries_active_uq collapses NULL variants via COALESCE so they collide in the index", () => {
+    // These tests mock `sql`, so they can't exercise real Postgres index behavior — this is a
+    // static guard that the schema keeps the NULL-variant fix in place (see schema.sql comment:
+    // Postgres treats each NULL as distinct in a unique index without the COALESCE).
+    const schemaPath = fileURLToPath(new URL("../../../db/schema.sql", import.meta.url));
+    const schema = readFileSync(schemaPath, "utf8");
+    expect(schema).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS entries_active_uq\s+ON entries \(user_id, game_id, puzzle_date, COALESCE\(variant, ''\)\)/,
+    );
   });
 });
