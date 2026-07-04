@@ -53,9 +53,6 @@ function mockFetchWithOnboarding(onboarding: Record<string, unknown>) {
         json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
       });
     }
-    if (url.includes("/api/invites/redeem")) {
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    }
     return Promise.resolve({ ok: true, json: async () => ({}) });
   });
 }
@@ -189,9 +186,6 @@ describe("AppShell", () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     global.fetch = mockFetchWithOnboarding({
       alreadyMember: true,
-      needsInvite: false,
-      migrationActive: false,
-      unclaimed: [],
     }) as unknown as typeof fetch;
 
     render(
@@ -205,13 +199,10 @@ describe("AppShell", () => {
     expect(screen.getAllByRole("link").length).toBeGreaterThan(0);
   });
 
-  it("shows the need-invite screen when needsInvite is true, without rendering the app", async () => {
+  it("shows the name-entry onboarding screen for a new user, without rendering the app", async () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     global.fetch = mockFetchWithOnboarding({
       alreadyMember: false,
-      needsInvite: true,
-      migrationActive: false,
-      unclaimed: [],
     }) as unknown as typeof fetch;
 
     render(
@@ -220,47 +211,14 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    await waitFor(() => expect(screen.getByText(/ask the group owner/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/display name/i)).toBeTruthy());
     expect(screen.queryByText("secret content")).toBeNull();
   });
 
-  it("shows the claim list when migrationActive with unclaimed players, and POSTs a claim on selection", async () => {
+  it("supports the create-player path and POSTs {displayName}", async () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     const fetchMock = mockFetchWithOnboarding({
       alreadyMember: false,
-      needsInvite: false,
-      migrationActive: true,
-      unclaimed: [{ id: "p1", displayName: "Abeer" }],
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    render(
-      <AppShell>
-        <div>secret content</div>
-      </AppShell>
-    );
-
-    await waitFor(() => expect(screen.getByText("Abeer")).toBeTruthy());
-
-    fireEvent.click(screen.getByText("Abeer"));
-
-    await waitFor(() => {
-      const postCall = findPostCall(fetchMock, "/api/onboarding");
-      expect(postCall).toBeTruthy();
-      expect(JSON.parse(postCall![1].body as string)).toEqual({ action: "claim", playerId: "p1" });
-    });
-
-    await waitFor(() => expect(screen.getByText(/waiting for the owner/i)).toBeTruthy());
-    expect(screen.queryByText("secret content")).toBeNull();
-  });
-
-  it("supports the create-player path and POSTs {action: 'create', displayName}", async () => {
-    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
-    const fetchMock = mockFetchWithOnboarding({
-      alreadyMember: false,
-      needsInvite: false,
-      migrationActive: false,
-      unclaimed: [],
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -281,7 +239,6 @@ describe("AppShell", () => {
       const postCall = findPostCall(fetchMock, "/api/onboarding");
       expect(postCall).toBeTruthy();
       expect(JSON.parse(postCall![1].body as string)).toEqual({
-        action: "create",
         displayName: "Abeer",
       });
     });

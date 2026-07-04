@@ -1,11 +1,10 @@
 "use client";
 import React, { Suspense, useEffect, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { getGames } from "@/lib/api";
 import { useTheme } from "@/design/theme";
 import { MenuIcon } from "@/design/icons";
 import { SignInGate } from "./SignInGate";
-import { NeedInvite } from "./NeedInvite";
 import { Onboarding } from "./Onboarding";
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
@@ -17,9 +16,6 @@ export interface AppShellProps {
 
 interface OnboardingState {
   alreadyMember: boolean;
-  needsInvite: boolean;
-  migrationActive: boolean;
-  unclaimed: { id: string; displayName: string }[];
 }
 
 function activeFromPathname(pathname: string | null): string {
@@ -39,19 +35,6 @@ async function fetchOnboarding(): Promise<OnboardingState | null> {
   }
 }
 
-async function redeemInvite(token: string): Promise<void> {
-  try {
-    await fetch("/api/invites/redeem", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
-  } catch {
-    // Best-effort — the onboarding fetch that follows reflects real
-    // eligibility regardless of whether redemption succeeded here.
-  }
-}
-
 export function AppShell({ children }: AppShellProps): JSX.Element {
   return (
     <Suspense fallback={null}>
@@ -67,7 +50,6 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -93,12 +75,8 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
-    const invite = searchParams?.get("invite");
 
     (async () => {
-      if (invite) {
-        await redeemInvite(invite);
-      }
       const state = await fetchOnboarding();
       if (cancelled) return;
       setOnboarding(state);
@@ -108,9 +86,6 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
     return () => {
       cancelled = true;
     };
-    // Deliberately excludes searchParams from deps beyond the invite token
-    // captured on the run that follows `authed` becoming true.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
   async function refreshOnboarding() {
@@ -118,20 +93,11 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
     setOnboarding(state);
   }
 
-  async function handleClaim(playerId: string): Promise<boolean> {
-    const res = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "claim", playerId }),
-    });
-    return res.ok;
-  }
-
   async function handleCreate(displayName: string): Promise<boolean> {
     const res = await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", displayName }),
+      body: JSON.stringify({ displayName }),
     });
     if (res.ok) {
       await refreshOnboarding();
@@ -152,17 +118,7 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   }
 
   if (onboarding && !onboarding.alreadyMember) {
-    if (onboarding.needsInvite) {
-      return <NeedInvite />;
-    }
-    return (
-      <Onboarding
-        migrationActive={onboarding.migrationActive}
-        unclaimed={onboarding.unclaimed}
-        onClaim={handleClaim}
-        onCreate={handleCreate}
-      />
-    );
+    return <Onboarding onCreate={handleCreate} />;
   }
 
   return (
