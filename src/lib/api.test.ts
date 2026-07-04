@@ -12,8 +12,8 @@ describe("normalizeError", () => {
     expect(normalizeError(403, { error: "Custom message" })).toBe("Custom message");
   });
 
-  it("maps 403 to a wrong-PIN message when no body.error is given", () => {
-    expect(normalizeError(403, {})).toBe("Wrong PIN.");
+  it("maps 403 to an access-denied message when no body.error is given", () => {
+    expect(normalizeError(403, {})).toBe("You don't have access to this.");
   });
 
   it("maps 401 to a sign-in message when no body.error is given", () => {

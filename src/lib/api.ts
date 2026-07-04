@@ -84,7 +84,7 @@ export function normalizeError(status: number, body: unknown): string {
     case 401:
       return "Please sign in again.";
     case 403:
-      return "Wrong PIN.";
+      return "You don't have access to this.";
     case 422:
       return "Couldn't read that — check the format.";
     default:
@@ -157,10 +157,6 @@ export function getMe(player: string): Promise<ApiResult<MeResponse>> {
   const params = new URLSearchParams();
   params.set("player", player);
   return request(`/api/me?${params.toString()}`);
-}
-
-export function postAuth(passphrase: string): Promise<ApiResult<{ ok: true }>> {
-  return request("/api/auth", jsonPost({ passphrase }));
 }
 
 export function postEntry(
