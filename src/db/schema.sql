@@ -136,3 +136,9 @@ CREATE TABLE IF NOT EXISTS join_eligibility (
   expires_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (user_id, group_id)
 );
+
+-- === Global identity (Phase 1 multi-group) — display name + platform super-admin ===
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id);
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS created_by TEXT REFERENCES users(id);
