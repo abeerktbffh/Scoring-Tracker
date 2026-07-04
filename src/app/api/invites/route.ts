@@ -23,7 +23,9 @@ export async function POST(req: Request) {
   const { token } = await createInvite(GROUP_ID, guard.viewer.userId, { ttlMs, maxUses });
 
   const origin = new URL(req.url).origin;
-  const link = `${origin}/onboarding?invite=${encodeURIComponent(token)}`;
+  // Invite handling lives in AppShell at the app root (?invite=…); there is no
+  // /onboarding page route, so link to "/" (a bad path 404s on click).
+  const link = `${origin}/?invite=${encodeURIComponent(token)}`;
 
   return NextResponse.json({ token, link });
 }
