@@ -62,7 +62,6 @@ describe("POST /api/entries", () => {
     // resolveSubmission is real; feed a valid manual submission
     resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION);
     sqlMock
-      .mockResolvedValueOnce([{ timezone: "Asia/Kolkata" }]) // group tz (pre-Task-9)
       .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
       .mockResolvedValueOnce([]) // prior lookup: none
       .mockResolvedValueOnce([]); // insert
@@ -83,12 +82,11 @@ describe("POST /api/entries", () => {
     guardMock.mockResolvedValue(USER_VIEWER);
     resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION);
     sqlMock
-      .mockResolvedValueOnce([{ timezone: "UTC" }]) // groups
       .mockResolvedValueOnce([]); // no matching game
 
     const res = await POST(jsonRequest({ gameId: "wordle", value: 4, solved: true }));
     expect(res.status).toBe(422);
-    expect(sqlMock).toHaveBeenCalledTimes(2);
+    expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 
   it("returns the parser's error/status on an unparseable rawInput and alerts Sentry", async () => {
@@ -106,7 +104,6 @@ describe("POST /api/entries", () => {
     guardMock.mockResolvedValue(USER_VIEWER);
     resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION);
     sqlMock
-      .mockResolvedValueOnce([{ timezone: "UTC" }]) // groups
       .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
       .mockResolvedValueOnce([{ id: "e_prior", version: 1 }]) // prior entry
       .mockResolvedValueOnce([]) // supersede update
@@ -114,7 +111,7 @@ describe("POST /api/entries", () => {
 
     const res = await POST(jsonRequest({ gameId: "wordle", value: 4, solved: true }));
     expect(res.status).toBe(200);
-    expect(sqlMock).toHaveBeenCalledTimes(5);
+    expect(sqlMock).toHaveBeenCalledTimes(4);
   });
 
   it("treats a 23505 on entries_active_uq as an idempotent re-log (200, supersede path)", async () => {
@@ -124,8 +121,7 @@ describe("POST /api/entries", () => {
     });
     resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION);
     sqlMock
-      .mockResolvedValueOnce([{ timezone: "Asia/Kolkata" }])
-      .mockResolvedValueOnce([{ id: "wordle" }])
+      .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
       .mockResolvedValueOnce([]) // prior: none seen
       .mockRejectedValueOnce({ code: "23505", constraint: "entries_active_uq" }) // race: someone inserted
       .mockResolvedValueOnce([{ id: "e_existing", version: 1 }]) // re-read prior

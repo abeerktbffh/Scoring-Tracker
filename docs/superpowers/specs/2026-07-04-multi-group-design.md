@@ -84,8 +84,8 @@ A membership is one person's presence in one **user-created** group. The global 
   `UPDATE entries e SET user_id = p.user_id FROM players p WHERE e.player_id = p.id;`
 - Reads/writes switch to `user_id`. `entries.group_id` **and `entries.player_id`** both become vestigial. Before they fall out of use, **drop their NOT NULL** constraints; drop the columns entirely in cleanup (both are in the drop list).
 - **One-active-entry-per-day is enforced by the DB**, not app logic. Replace the plain `entries_active_idx` with a **partial UNIQUE index**:
-  `CREATE UNIQUE INDEX entries_active_uq ON entries (user_id, game_id, puzzle_date, variant) WHERE superseded_by IS NULL;`
-  - Note: SQL unique indexes treat NULLs as distinct, so a `NULL` variant does not self-collide. The write path keys variant with `IS NOT DISTINCT FROM` (as today); for games without variants this is acceptable because there is at most one row per `(user,game,date)` anyway. The plan must confirm variant handling per game type.
+  `CREATE UNIQUE INDEX entries_active_uq ON entries (user_id, game_id, puzzle_date, COALESCE(variant, '')) WHERE superseded_by IS NULL;`
+  - Note: SQL unique indexes treat NULLs as **distinct**, so a bare `variant` column would NOT dedupe no-variant games (the common case) under a concurrent race — both inserts would succeed. `COALESCE(variant, '')` collapses NULL to a single indexable value so the guarantee holds for NULL-variant games too. No game uses `''` as a real variant, so this is safe. The write path keys variant with `IS NOT DISTINCT FROM` (NULL-safe) and supersedes-before-insert.
 - The submit path (currently SELECT-prior → INSERT-new → UPDATE-old across three statements, **non-atomic**) must **catch unique-violation `23505`** and treat it as "someone already logged this slot," re-reading and superseding deterministically — the same conditional-write + constraint pattern already used in `src/lib/claims.ts`. No interactive transaction is available (stateless Neon HTTP driver).
 
 ### `groups` — modify

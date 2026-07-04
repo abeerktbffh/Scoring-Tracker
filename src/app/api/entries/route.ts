@@ -4,11 +4,10 @@ import { sql } from "@/db/client";
 import { requireUser } from "@/lib/membership";
 import { newId } from "@/lib/ids";
 import { localDateInTz } from "@/lib/day";
+import { PLATFORM_TZ } from "@/lib/group";
 import { resolveSubmission, type ResolvedSubmission } from "@/lib/submission";
 
 export const runtime = "nodejs";
-
-const GROUP_ID = "g1";
 
 interface NeonDbErrorLike {
   code?: string;
@@ -93,19 +92,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }
 
-  const groupRows = (await sql`SELECT timezone FROM groups WHERE id = ${GROUP_ID}`) as {
-    timezone: string;
-  }[];
-  if (!groupRows[0]) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const timezone = groupRows[0].timezone; // timezone from PLATFORM_TZ once Task 9 lands
-
   // Verify the game exists in the catalog (no group filter — catalog is global).
   const game = (await sql`
     SELECT id FROM games WHERE id = ${resolved.gameId} AND active = true
   `) as { id: string }[];
   if (!game[0]) return NextResponse.json({ error: "Unknown game" }, { status: 422 });
 
-  const puzzleDate = localDateInTz(timezone);
+  const puzzleDate = localDateInTz(PLATFORM_TZ);
   await supersedeAndInsert(userId, resolved, puzzleDate);
 
   return NextResponse.json({ ok: true, parsed: resolved });

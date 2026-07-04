@@ -441,11 +441,13 @@ git commit -m "feat(admin): catalog games are global + gated by requireSuperAdmi
 Append to `src/db/schema.sql`:
 ```sql
 -- One active entry per user/game/day/variant (DB-enforced; replaces the plain entries_active_idx for dedup)
+-- COALESCE collapses NULL variants to one indexable value: Postgres treats each NULL as DISTINCT in a
+-- unique index, so a bare `variant` column would NOT dedupe no-variant games (the common case) under a race.
 CREATE UNIQUE INDEX IF NOT EXISTS entries_active_uq
-  ON entries (user_id, game_id, puzzle_date, variant)
+  ON entries (user_id, game_id, puzzle_date, COALESCE(variant, ''))
   WHERE superseded_by IS NULL;
 ```
-(The old `entries_active_idx` on `(group_id, game_id, puzzle_date)` stays as a read index until Task 12.)
+(The old `entries_active_idx` on `(group_id, game_id, puzzle_date)` stays as a read index until Task 12. No game uses `''` as a variant, so collapsing NULL→`''` is safe.)
 
 - [ ] **Step 2: Write the failing test**
 
