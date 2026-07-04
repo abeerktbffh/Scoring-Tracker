@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS claims (
 CREATE UNIQUE INDEX IF NOT EXISTS claims_one_pending_per_player
   ON claims (player_id) WHERE claim_status = 'pending';
 
--- === Invites (join gate; store token HASH only) ===
+-- === Invites (join gate — store token HASH only) ===
 CREATE TABLE IF NOT EXISTS invites (
   id          TEXT PRIMARY KEY,
   group_id    TEXT NOT NULL REFERENCES groups(id),
