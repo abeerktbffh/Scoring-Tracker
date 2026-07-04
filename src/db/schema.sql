@@ -142,3 +142,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE entries ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id);
 ALTER TABLE groups ADD COLUMN IF NOT EXISTS created_by TEXT REFERENCES users(id);
+
+-- One active entry per user/game/day/variant (DB-enforced; replaces the plain entries_active_idx for dedup)
+CREATE UNIQUE INDEX IF NOT EXISTS entries_active_uq
+  ON entries (user_id, game_id, puzzle_date, variant)
+  WHERE superseded_by IS NULL;
