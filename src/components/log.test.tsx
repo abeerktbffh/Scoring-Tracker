@@ -55,13 +55,17 @@ afterEach(() => {
   cleanup();
 });
 
-async function enterPin(pin = "1234") {
-  const pinInput = screen.getByLabelText(/pin/i);
-  fireEvent.change(pinInput, { target: { value: pin } });
-}
-
 describe("Log", () => {
-  it("pastes text and submits, calling postEntry with displayName/pin/rawInput; clears + confirms on success", async () => {
+  it("has no name or PIN inputs — identity comes from the session", async () => {
+    render(<Log />);
+
+    await waitFor(() => expect(mockedGetGames).toHaveBeenCalled());
+
+    expect(screen.queryByLabelText(/pin/i)).toBeNull();
+    expect(screen.queryByPlaceholderText(/who are you/i)).toBeNull();
+  });
+
+  it("pastes text and submits, calling postEntry with only rawInput; clears + confirms on success", async () => {
     mockedPostEntry.mockResolvedValue({
       ok: true,
       data: { ok: true, parsed: { gameId: "wordle", value: 3 } },
@@ -71,8 +75,6 @@ describe("Log", () => {
 
     await waitFor(() => expect(mockedGetGames).toHaveBeenCalled());
 
-    await enterPin("4242");
-
     const textarea = screen.getByPlaceholderText(/paste/i);
     fireEvent.change(textarea, { target: { value: "Wordle 1,234 3/6\n⬛🟨⬛⬛⬛\n🟩🟩🟩🟩🟩" } });
 
@@ -80,8 +82,6 @@ describe("Log", () => {
 
     await waitFor(() =>
       expect(mockedPostEntry).toHaveBeenCalledWith({
-        displayName: "You",
-        pin: "4242",
         rawInput: "Wordle 1,234 3/6\n⬛🟨⬛⬛⬛\n🟩🟩🟩🟩🟩",
       })
     );
@@ -100,7 +100,6 @@ describe("Log", () => {
     render(<Log />);
 
     await waitFor(() => expect(mockedGetGames).toHaveBeenCalled());
-    await enterPin("4242");
 
     const textarea = screen.getByPlaceholderText(/paste/i);
     fireEvent.change(textarea, { target: { value: "garbage input" } });
@@ -110,7 +109,7 @@ describe("Log", () => {
     expect((textarea as HTMLTextAreaElement).value).toBe("garbage input");
   });
 
-  it("manual mode: picking a game then submitting calls postEntry with gameId/value/solved", async () => {
+  it("manual mode: picking a game then submitting calls postEntry with only gameId/value/solved", async () => {
     mockedPostEntry.mockResolvedValue({
       ok: true,
       data: { ok: true, parsed: { gameId: "wordle", value: 4 } },
@@ -119,7 +118,6 @@ describe("Log", () => {
     render(<Log />);
 
     await waitFor(() => expect(screen.getByText("Wordle")).toBeTruthy());
-    await enterPin("9999");
 
     fireEvent.click(screen.getByText("Wordle"));
 
@@ -130,8 +128,6 @@ describe("Log", () => {
 
     await waitFor(() =>
       expect(mockedPostEntry).toHaveBeenCalledWith({
-        displayName: "You",
-        pin: "9999",
         gameId: "wordle",
         value: 4,
         solved: false,

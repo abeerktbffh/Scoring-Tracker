@@ -59,8 +59,6 @@ export interface NewGameInput {
 }
 
 export interface EntryInput {
-  displayName: string;
-  pin: string;
   rawInput?: string;
   gameId?: string;
   variant?: string;
