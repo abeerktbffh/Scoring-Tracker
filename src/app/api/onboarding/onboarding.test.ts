@@ -89,11 +89,35 @@ describe("POST /api/onboarding", () => {
     resolveViewerMock.mockResolvedValue({ userId: "u5", player: null, isAdmin: false });
     // create path: email lookup (no email) then clear-eligibility.
     sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    createFreshPlayerMock.mockResolvedValue({ id: "p20" });
+    createFreshPlayerMock.mockResolvedValue({ ok: true, id: "p20" });
 
     const res = await POST(jsonRequest({ action: "create", displayName: "Eve" }));
     expect(res.status).toBe(200);
     expect(createFreshPlayerMock).toHaveBeenCalledWith("u5", "g1", "Eve");
+  });
+
+  it("409s with a clean error when the display name is already taken (case-insensitively)", async () => {
+    authMock.mockResolvedValue({ user: { id: "u11" } });
+    resolveViewerMock.mockResolvedValue({ userId: "u11", player: null, isAdmin: false });
+    createFreshPlayerMock.mockResolvedValue({ ok: false, reason: "name-taken" });
+
+    const res = await POST(jsonRequest({ action: "create", displayName: "abeer" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("That name is taken — pick another.");
+    // Must not proceed to email lookup / eligibility clearing on failure.
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  it("trims displayName before passing it to createFreshPlayer", async () => {
+    authMock.mockResolvedValue({ user: { id: "u12" } });
+    resolveViewerMock.mockResolvedValue({ userId: "u12", player: null, isAdmin: false });
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    createFreshPlayerMock.mockResolvedValue({ ok: true, id: "p21" });
+
+    const res = await POST(jsonRequest({ action: "create", displayName: "  Eve  " }));
+    expect(res.status).toBe(200);
+    expect(createFreshPlayerMock).toHaveBeenCalledWith("u12", "g1", "Eve");
   });
 
   it("allows action=claim for an eligible non-member and calls createPendingClaim", async () => {
@@ -128,7 +152,7 @@ describe("POST /api/onboarding", () => {
     sqlMock
       .mockResolvedValueOnce([{ email: "eve@example.com" }]) // user email lookup
       .mockResolvedValueOnce([]); // delete eligibility
-    createFreshPlayerMock.mockResolvedValue({ id: "p10" });
+    createFreshPlayerMock.mockResolvedValue({ ok: true, id: "p10" });
 
     const res = await POST(jsonRequest({ action: "create", displayName: "Eve" }));
     expect(res.status).toBe(200);
@@ -140,7 +164,7 @@ describe("POST /api/onboarding", () => {
     authMock.mockResolvedValue({ user: { id: "u9" } });
     resolveViewerMock.mockResolvedValue({ userId: "u9", player: { id: "p1", displayName: "A" }, isAdmin: false });
     sqlMock.mockResolvedValue([{ email: "member@example.com" }]);
-    createFreshPlayerMock.mockResolvedValue({ id: "p11" });
+    createFreshPlayerMock.mockResolvedValue({ ok: true, id: "p11" });
 
     const res = await POST(jsonRequest({ action: "create", displayName: "Second" }));
     expect(res.status).toBe(200);

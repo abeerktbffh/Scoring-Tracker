@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   if (!player[0]) return NextResponse.json({ error: "Player not found" }, { status: 404 });
 
   const clash = (await sql`
-    SELECT id FROM players WHERE group_id = ${GROUP_ID} AND display_name = ${name} AND id <> ${playerId}
+    SELECT id FROM players WHERE group_id = ${GROUP_ID} AND lower(display_name) = lower(${name}) AND id <> ${playerId}
   `) as { id: string }[];
   if (clash[0]) return NextResponse.json({ error: "Name already taken" }, { status: 409 });
 

@@ -1,8 +1,8 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
-import { getMe, getLeaderboard } from "@/lib/api";
+import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
-import { loadName } from "@/lib/rememberMe";
+import { loadName, saveName } from "@/lib/rememberMe";
 import { toDayNumber } from "@/lib/day";
 import { Card } from "@/components/Card";
 import { StatCard } from "@/components/StatCard";
@@ -10,6 +10,7 @@ import { StreakBadge } from "@/components/StreakBadge";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/Button";
 import styles from "./page.module.css";
 
 type LoadState =
@@ -64,6 +65,15 @@ export default function You(): JSX.Element {
 
   const handleRetry = useCallback(() => load(name), [load, name]);
 
+  const handleRenamed = useCallback(
+    (newName: string) => {
+      setName(newName);
+      saveName(newName);
+      load(newName);
+    },
+    [load]
+  );
+
   return (
     <div className={styles.wrap}>
       <h1 className={styles.pageTitle}>You</h1>
@@ -88,7 +98,9 @@ export default function You(): JSX.Element {
 
       {state.status === "error" && <ErrorState message={state.message} onRetry={handleRetry} />}
 
-      {state.status === "ready" && <YouReady me={state.me} rows={state.rows} name={name} />}
+      {state.status === "ready" && (
+        <YouReady me={state.me} rows={state.rows} name={name} onRenamed={handleRenamed} />
+      )}
     </div>
   );
 }
@@ -97,9 +109,15 @@ interface YouReadyProps {
   me: MeResponse;
   rows: OverallRow[];
   name: string | null;
+  onRenamed: (newName: string) => void;
 }
 
-function YouReady({ me, rows, name }: YouReadyProps): JSX.Element {
+function YouReady({ me, rows, name, onRenamed }: YouReadyProps): JSX.Element {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   if (!name) {
     return (
       <EmptyState
@@ -116,15 +134,81 @@ function YouReady({ me, rows, name }: YouReadyProps): JSX.Element {
   const bestStreak = bestLongestStreak(me);
   const initial = name.trim().charAt(0).toUpperCase();
 
+  const startEditing = () => {
+    setDraftName(name);
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setDraftName("");
+    setEditError(null);
+  };
+
+  const trimmedDraft = draftName.trim();
+  const canSave = trimmedDraft.length > 0 && trimmedDraft !== name && !isSaving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setIsSaving(true);
+    setEditError(null);
+    const result = await renameSelf(trimmedDraft);
+    setIsSaving(false);
+    if (result.ok) {
+      setIsEditing(false);
+      setDraftName("");
+      onRenamed(trimmedDraft);
+      return;
+    }
+    if (result.status === 409) {
+      setEditError("That name's taken — pick another.");
+      return;
+    }
+    setEditError(result.error);
+  };
+
   return (
     <>
       <div className={styles.header}>
         <div className={styles.avatar}>{initial}</div>
-        <div>
+        <div className={styles.headerText}>
           <p className={styles.name}>{name}</p>
           <p className={styles.rank}>{rank !== null ? `Rank #${rank} · this week` : "Unranked this week"}</p>
         </div>
+        {!isEditing && (
+          <button type="button" className={styles.editLink} onClick={startEditing}>
+            Edit name
+          </button>
+        )}
       </div>
+
+      {isEditing && (
+        <Card>
+          <div className={styles.editForm}>
+            <label className={styles.editLabel} htmlFor="edit-name-input">
+              Change your name
+            </label>
+            <input
+              id="edit-name-input"
+              type="text"
+              className={styles.editInput}
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              disabled={isSaving}
+            />
+            {editError && <p className={styles.editError}>{editError}</p>}
+            <div className={styles.editActions}>
+              <Button variant="primary" onClick={handleSave} disabled={!canSave}>
+                Save
+              </Button>
+              <Button variant="ghost" onClick={cancelEditing} disabled={isSaving}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className={styles.statRow}>
         <StatCard value={wins} label="Wins" />

@@ -95,6 +95,12 @@ ALTER TABLE players ALTER COLUMN pin_hash DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS players_group_user_uq
   ON players (group_id, user_id) WHERE user_id IS NOT NULL;
 
+-- Case-insensitive display-name uniqueness within a group (backstop for the
+-- race window between an app-level pre-check and the INSERT/UPDATE) --
+-- keep the existing UNIQUE (group_id, display_name) too, it is harmless
+CREATE UNIQUE INDEX IF NOT EXISTS players_group_lower_name_uq
+  ON players (group_id, lower(display_name));
+
 -- === Claims (migration-only, audited) ===
 CREATE TABLE IF NOT EXISTS claims (
   id                 TEXT PRIMARY KEY,

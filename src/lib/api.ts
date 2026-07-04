@@ -176,6 +176,12 @@ export function renamePlayer(
   return request("/api/admin/players/rename", jsonPost({ playerId, newName }));
 }
 
+export function renameSelf(
+  newName: string
+): Promise<ApiResult<{ ok: true; displayName: string }>> {
+  return request("/api/me/rename", jsonPost({ newName }));
+}
+
 export interface PendingClaim {
   id: string;
   playerId: string;
