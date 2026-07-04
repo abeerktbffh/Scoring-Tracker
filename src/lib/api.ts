@@ -59,8 +59,6 @@ export interface NewGameInput {
 }
 
 export interface EntryInput {
-  displayName: string;
-  pin: string;
   rawInput?: string;
   gameId?: string;
   variant?: string;
@@ -86,7 +84,7 @@ export function normalizeError(status: number, body: unknown): string {
     case 401:
       return "Please sign in again.";
     case 403:
-      return "Wrong PIN.";
+      return "You don't have access to this.";
     case 422:
       return "Couldn't read that — check the format.";
     default:
@@ -161,30 +159,45 @@ export function getMe(player: string): Promise<ApiResult<MeResponse>> {
   return request(`/api/me?${params.toString()}`);
 }
 
-export function postAuth(passphrase: string): Promise<ApiResult<{ ok: true }>> {
-  return request("/api/auth", jsonPost({ passphrase }));
-}
-
 export function postEntry(
   body: EntryInput
 ): Promise<ApiResult<{ ok: true; parsed: { gameId: string; value: number; [key: string]: unknown } }>> {
   return request("/api/entries", jsonPost(body));
 }
 
-export function postAdminGame(
-  adminPassphrase: string,
-  game: NewGameInput
-): Promise<ApiResult<{ game: Game }>> {
-  return request("/api/admin/games", jsonPost({ adminPassphrase, ...game }));
+export function postAdminGame(game: NewGameInput): Promise<ApiResult<{ game: Game }>> {
+  return request("/api/admin/games", jsonPost(game));
 }
 
 export function renamePlayer(
-  adminPassphrase: string,
   playerId: string,
   newName: string
 ): Promise<ApiResult<{ ok: true }>> {
-  return request(
-    "/api/admin/players/rename",
-    jsonPost({ adminPassphrase, playerId, newName })
-  );
+  return request("/api/admin/players/rename", jsonPost({ playerId, newName }));
+}
+
+export interface PendingClaim {
+  id: string;
+  playerId: string;
+  playerDisplayName: string;
+  claimedByUserId: string;
+  claimedByEmail: string | null;
+  claimedAt: string;
+}
+
+export function getPendingClaims(): Promise<ApiResult<{ claims: PendingClaim[] }>> {
+  return request("/api/admin/claims");
+}
+
+export type ClaimDecision = "approve" | "reject";
+
+export function decideClaim(
+  claimId: string,
+  decision: ClaimDecision
+): Promise<ApiResult<{ ok: true }>> {
+  return request(`/api/admin/claims/${encodeURIComponent(claimId)}`, jsonPost({ decision }));
+}
+
+export function createInvite(): Promise<ApiResult<{ token: string; link: string }>> {
+  return request("/api/invites", jsonPost({}));
 }

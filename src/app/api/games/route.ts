@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { sql } from "@/db/client";
-import { verifyGroupToken } from "@/auth/token";
+import { requireMember } from "@/lib/membership";
+import { GROUP_ID } from "@/lib/group";
 
 export const runtime = "nodejs";
 
+/**
+ * Group-level access is now gated by session membership (`requireMember`),
+ * not the legacy `group_token` cookie. `requireMember` re-resolves
+ * membership from the DB on every call: no session -> 401, session but not
+ * a member of the group -> 403.
+ */
 export async function GET() {
-  const token = cookies().get("group_token")?.value;
-  const payload = token ? await verifyGroupToken(token) : null;
-  if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await requireMember();
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
+  const groupId = GROUP_ID;
 
   const rows = (await sql`
     SELECT id, name, type, metric_direction, has_variants
-    FROM games WHERE group_id = ${payload.groupId} AND active = true
+    FROM games WHERE group_id = ${groupId} AND active = true
     ORDER BY name
   `) as {
     id: string;

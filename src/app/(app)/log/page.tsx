@@ -2,9 +2,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getGames, getMe, postEntry } from "@/lib/api";
 import type { Game } from "@/lib/api";
-import { loadName, saveName } from "@/lib/rememberMe";
+import { loadName } from "@/lib/rememberMe";
 import { Button } from "@/components/Button";
-import { Card } from "@/components/Card";
 import { GamePicker } from "@/components/GamePicker";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -18,7 +17,6 @@ type GamesState =
 
 export default function Log(): JSX.Element {
   const [name, setName] = useState("");
-  const [pin, setPin] = useState("");
   const [gamesState, setGamesState] = useState<GamesState>({ status: "loading" });
   const [dueTodayIds, setDueTodayIds] = useState<string[]>([]);
 
@@ -65,11 +63,6 @@ export default function Log(): JSX.Element {
     });
   }, [name]);
 
-  function handleNameChange(next: string) {
-    setName(next);
-    if (next.trim()) saveName(next);
-  }
-
   function describeParsed(parsed: { gameId: string; value: number; [key: string]: unknown }): string {
     const game = gamesState.status === "ready" ? gamesState.games.find((g) => g.id === parsed.gameId) : undefined;
     const label = game?.name ?? parsed.gameId;
@@ -81,7 +74,7 @@ export default function Log(): JSX.Element {
     setPasteError(null);
     setPasteConfirmation(null);
     setPasteSubmitting(true);
-    const result = await postEntry({ displayName: name, pin, rawInput });
+    const result = await postEntry({ rawInput });
     setPasteSubmitting(false);
     if (!result.ok) {
       setPasteError(result.error);
@@ -109,8 +102,6 @@ export default function Log(): JSX.Element {
     setManualSubmitting(true);
     const selectedGame = gamesState.status === "ready" ? gamesState.games.find((g) => g.id === selectedGameId) : undefined;
     const result = await postEntry({
-      displayName: name,
-      pin,
       gameId: selectedGameId,
       ...(selectedGame?.hasVariants && variant ? { variant } : {}),
       value: Number(value),
@@ -131,39 +122,9 @@ export default function Log(): JSX.Element {
   const selectedGame =
     gamesState.status === "ready" ? gamesState.games.find((g) => g.id === selectedGameId) ?? null : null;
 
-  const canSubmit = name.trim().length > 0 && pin.trim().length > 0;
-
   return (
     <div className={styles.wrap}>
       <h1 className={styles.pageTitle}>Log a result</h1>
-
-      <Card className={styles.identity}>
-        <label className={styles.identityLabel} htmlFor="log-name">
-          Name
-        </label>
-        <input
-          id="log-name"
-          className={styles.identityInput}
-          type="text"
-          placeholder="Who are you?"
-          autoComplete="name"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-        />
-        <label className={styles.identityLabel} htmlFor="log-pin">
-          PIN
-        </label>
-        <input
-          id="log-pin"
-          className={styles.identityInput}
-          type="password"
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder="Your PIN"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </Card>
 
       <form className={styles.pasteSection} onSubmit={handlePasteSubmit}>
         <p className={styles.label}>Paste &amp; we&rsquo;ll figure it out</p>
@@ -184,7 +145,7 @@ export default function Log(): JSX.Element {
           type="submit"
           variant="primary"
           className={styles.submit}
-          disabled={!canSubmit || !rawInput.trim() || pasteSubmitting}
+          disabled={!rawInput.trim() || pasteSubmitting}
         >
           {pasteSubmitting ? "Logging…" : "Log it"}
         </Button>
@@ -263,7 +224,7 @@ export default function Log(): JSX.Element {
             type="submit"
             variant="amber"
             className={styles.submit}
-            disabled={!canSubmit || value.trim() === "" || manualSubmitting}
+            disabled={value.trim() === "" || manualSubmitting}
           >
             {manualSubmitting ? "Saving…" : "Save entry"}
           </Button>

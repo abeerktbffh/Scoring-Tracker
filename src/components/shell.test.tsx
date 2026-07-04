@@ -6,18 +6,62 @@ import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { AppShell } from "./AppShell";
 import { getGames } from "@/lib/api";
+import { signOut } from "next-auth/react";
+
+const mockSearchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/"),
+  useSearchParams: vi.fn(() => mockSearchParams),
 }));
 
 vi.mock("@/lib/api", () => ({
   getGames: vi.fn(),
 }));
 
+vi.mock("next-auth/react", () => ({
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}));
+
 const mockedGetGames = vi.mocked(getGames);
+const mockedSignOut = vi.mocked(signOut);
+
+function findPostCall(
+  fetchMock: ReturnType<typeof vi.fn>,
+  urlIncludes: string
+): [RequestInfo | URL, RequestInit] | undefined {
+  return fetchMock.mock.calls.find(
+    (call: unknown[]) =>
+      (call[0] as RequestInfo | URL).toString().includes(urlIncludes) &&
+      (call[1] as RequestInit | undefined)?.method === "POST"
+  ) as [RequestInfo | URL, RequestInit] | undefined;
+}
+
+function mockFetchWithOnboarding(onboarding: Record<string, unknown>) {
+  return vi.fn().mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/onboarding")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => onboarding,
+      });
+    }
+    if (url.includes("/api/auth/providers")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
+      });
+    }
+    if (url.includes("/api/invites/redeem")) {
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    }
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+}
 
 beforeEach(() => {
+  mockSearchParams.forEach((_v, k) => mockSearchParams.delete(k));
   // jsdom doesn't implement matchMedia; useTheme() (consumed by AppShell) calls it
   // on mount to resolve the system preference.
   window.matchMedia =
@@ -32,6 +76,13 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }));
+
+  // SignInGate (rendered when signed out) probes Auth.js's providers endpoint
+  // on mount to decide whether to show the Google button.
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
+  }) as unknown as typeof fetch;
 });
 
 afterEach(() => {
@@ -62,11 +113,19 @@ describe("TabBar", () => {
 });
 
 describe("Drawer", () => {
-  it("does not show a Sign out control, but shows a theme toggle when open", () => {
+  it("shows a Sign out control and a theme toggle when open", () => {
     render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
 
-    expect(screen.queryByText(/sign out/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
+  });
+
+  it("calls signOut when Sign out is clicked", () => {
+    render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+
+    expect(mockedSignOut).toHaveBeenCalledWith({ callbackUrl: "/" });
   });
 
   it("calls setTheme with the opposite theme when the toggle is clicked", () => {
@@ -122,12 +181,18 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    await waitFor(() => expect(screen.getByLabelText(/group passphrase/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/^email$/i)).toBeTruthy());
     expect(screen.queryByText("secret content")).toBeNull();
   });
 
-  it("renders children, TabBar, and a menu button when authed", async () => {
+  it("renders children, TabBar, and a menu button when authed and already a member", async () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+      needsInvite: false,
+      migrationActive: false,
+      unclaimed: [],
+    }) as unknown as typeof fetch;
 
     render(
       <AppShell>
@@ -138,5 +203,87 @@ describe("AppShell", () => {
     await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
     expect(screen.getByRole("button", { name: /menu/i })).toBeTruthy();
     expect(screen.getAllByRole("link").length).toBeGreaterThan(0);
+  });
+
+  it("shows the need-invite screen when needsInvite is true, without rendering the app", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: false,
+      needsInvite: true,
+      migrationActive: false,
+      unclaimed: [],
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText(/ask the group owner/i)).toBeTruthy());
+    expect(screen.queryByText("secret content")).toBeNull();
+  });
+
+  it("shows the claim list when migrationActive with unclaimed players, and POSTs a claim on selection", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    const fetchMock = mockFetchWithOnboarding({
+      alreadyMember: false,
+      needsInvite: false,
+      migrationActive: true,
+      unclaimed: [{ id: "p1", displayName: "Abeer" }],
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Abeer")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("Abeer"));
+
+    await waitFor(() => {
+      const postCall = findPostCall(fetchMock, "/api/onboarding");
+      expect(postCall).toBeTruthy();
+      expect(JSON.parse(postCall![1].body as string)).toEqual({ action: "claim", playerId: "p1" });
+    });
+
+    await waitFor(() => expect(screen.getByText(/waiting for the owner/i)).toBeTruthy());
+    expect(screen.queryByText("secret content")).toBeNull();
+  });
+
+  it("supports the create-player path and POSTs {action: 'create', displayName}", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    const fetchMock = mockFetchWithOnboarding({
+      alreadyMember: false,
+      needsInvite: false,
+      migrationActive: false,
+      unclaimed: [],
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByLabelText(/display name/i)).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: "Abeer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create my player/i }));
+
+    await waitFor(() => {
+      const postCall = findPostCall(fetchMock, "/api/onboarding");
+      expect(postCall).toBeTruthy();
+      expect(JSON.parse(postCall![1].body as string)).toEqual({
+        action: "create",
+        displayName: "Abeer",
+      });
+    });
   });
 });
