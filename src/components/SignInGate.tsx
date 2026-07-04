@@ -126,7 +126,7 @@ export function SignInGate({ onAuthed }: SignInGateProps): JSX.Element {
               <>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="primary"
                   className={styles.google}
                   onClick={handleGoogle}
                 >
