@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { sql } from "@/db/client";
 import { verifyGroupToken } from "@/auth/token";
+import { resolveViewer } from "@/lib/membership";
 import { computeOverall } from "@/scoring/leaderboard";
 import type { GameEntry } from "@/scoring/wins";
 import { localDateInTz } from "@/lib/day";
@@ -19,7 +20,10 @@ export async function GET(req: Request) {
 
   const param = new URL(req.url).searchParams.get("window");
   const window: Window = WINDOWS.includes(param as Window) ? (param as Window) : "daily";
-  const viewer = new URL(req.url).searchParams.get("player") ?? "";
+  // Viewer is resolved from the session, not a client-supplied param — used
+  // only for no-peek (restricts, never widens) and self-highlight.
+  const viewer = await resolveViewer();
+  const viewerPlayerId = viewer?.player?.id ?? null;
 
   const groupRows = (await sql`SELECT timezone FROM groups WHERE id = ${groupId}`) as {
     timezone: string;
@@ -52,10 +56,12 @@ export async function GET(req: Request) {
   // No-peek: for the daily window, only reveal games the viewer has played today.
   let visibleRows = rows;
   let locked = false;
-  // No-peek is a UX/fairness aid, not a security boundary: the viewer is an unauthenticated display-name param and this only ever restricts (never widens) what is shown.
+  // No-peek is a UX/fairness aid, not a security boundary. The viewer is now
+  // resolved from the session (never a client param); with no session
+  // player, treat the viewer as having played nothing (locked).
   if (window === "daily") {
     const playedGameIds = new Set(
-      rows.filter((r) => r.display_name === viewer).map((r) => r.game_id),
+      rows.filter((r) => r.player_id === viewerPlayerId).map((r) => r.game_id),
     );
     locked = playedGameIds.size === 0;
     visibleRows = rows.filter((r) => playedGameIds.has(r.game_id));
