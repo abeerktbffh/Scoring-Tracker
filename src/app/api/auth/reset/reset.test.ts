@@ -66,7 +66,7 @@ describe("POST /api/auth/reset — request step ({email})", () => {
     expect(sendPasswordResetEmailMock).toHaveBeenCalledTimes(1);
     const [to, link] = sendPasswordResetEmailMock.mock.calls[0];
     expect(to).toBe("creds@example.com");
-    expect(link).toContain("/api/auth/reset?token=");
+    expect(link).toContain("/reset?token=");
     expect(JSON.stringify(body)).not.toMatch(/token/i);
   });
 

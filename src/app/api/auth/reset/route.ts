@@ -44,7 +44,7 @@ async function issueResetToken(email: string, origin: string): Promise<void> {
     INSERT INTO verification_token (identifier, token, expires, purpose)
     VALUES (${email}, ${token}, ${expires.toISOString()}, 'reset')
   `;
-  const link = `${origin}/api/auth/reset?token=${encodeURIComponent(token)}`;
+  const link = `${origin}/reset?token=${encodeURIComponent(token)}`;
   await sendPasswordResetEmail(email, link);
 }
 

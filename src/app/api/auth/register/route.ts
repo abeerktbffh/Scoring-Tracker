@@ -88,7 +88,7 @@ export async function POST(req: Request) {
   `;
 
   const origin = new URL(req.url).origin;
-  const link = `${origin}/api/auth/verify?token=${encodeURIComponent(token)}`;
+  const link = `${origin}/verify?token=${encodeURIComponent(token)}`;
   await sendVerificationEmail(email, link);
 
   return NextResponse.json({ ok: true });

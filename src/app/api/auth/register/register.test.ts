@@ -74,7 +74,7 @@ describe("POST /api/auth/register", () => {
     expect(sendVerificationEmailMock).toHaveBeenCalledTimes(1);
     const [to, link] = sendVerificationEmailMock.mock.calls[0];
     expect(to).toBe("new@example.com");
-    expect(link).toContain("/api/auth/verify?token=");
+    expect(link).toContain("/verify?token=");
   });
 
   it("rate-limits by both email and IP — either failing blocks the request", async () => {
