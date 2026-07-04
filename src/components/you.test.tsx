@@ -3,22 +3,26 @@ import React from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import You from "@/app/(app)/you/page";
-import { getMe, getLeaderboard } from "@/lib/api";
-import { loadName } from "@/lib/rememberMe";
+import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
+import { loadName, saveName } from "@/lib/rememberMe";
 import type { MeResponse, OverallRow } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   getMe: vi.fn(),
   getLeaderboard: vi.fn(),
+  renameSelf: vi.fn(),
 }));
 
 vi.mock("@/lib/rememberMe", () => ({
   loadName: vi.fn(),
+  saveName: vi.fn(),
 }));
 
 const mockedGetMe = vi.mocked(getMe);
 const mockedGetLeaderboard = vi.mocked(getLeaderboard);
 const mockedLoadName = vi.mocked(loadName);
+const mockedRenameSelf = vi.mocked(renameSelf);
+const mockedSaveName = vi.mocked(saveName);
 
 const today = "2026-07-03";
 const yesterday = "2026-07-02";
@@ -47,6 +51,8 @@ beforeEach(() => {
   mockedGetMe.mockReset();
   mockedGetLeaderboard.mockReset();
   mockedLoadName.mockReset();
+  mockedRenameSelf.mockReset();
+  mockedSaveName.mockReset();
   mockedLoadName.mockReturnValue("You");
 });
 
@@ -185,5 +191,68 @@ describe("You", () => {
     render(<You />);
 
     await waitFor(() => expect(screen.getByText(/sign in|set a name/i)).toBeTruthy());
+  });
+
+  describe("Edit name", () => {
+    beforeEach(() => {
+      mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: leaderboardRows },
+      });
+    });
+
+    it("reveals an inline input pre-filled with the current name when clicking Edit name", async () => {
+      render(<You />);
+
+      await waitFor(() => expect(screen.getAllByText("You").length).toBeGreaterThan(0));
+
+      fireEvent.click(screen.getByRole("button", { name: /edit name/i }));
+
+      const input = screen.getByRole("textbox") as HTMLInputElement;
+      expect(input.value).toBe("You");
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^cancel$/i })).toBeTruthy();
+    });
+
+    it("saves the trimmed new name, updates the header, and persists it via saveName", async () => {
+      mockedRenameSelf.mockResolvedValue({ ok: true, data: { ok: true, displayName: "Abeer" } });
+
+      render(<You />);
+
+      await waitFor(() => expect(screen.getAllByText("You").length).toBeGreaterThan(0));
+      expect(mockedGetMe).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByRole("button", { name: /edit name/i }));
+      const input = screen.getByRole("textbox") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "  Abeer  " } });
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(mockedRenameSelf).toHaveBeenCalledWith("Abeer"));
+      await waitFor(() => expect(screen.getAllByText("Abeer").length).toBeGreaterThan(0));
+      expect(mockedSaveName).toHaveBeenCalledWith("Abeer");
+      // Editor closed
+      expect(screen.queryByRole("textbox")).toBeNull();
+      // Data reloaded for the new name
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledTimes(2));
+    });
+
+    it("shows a 'taken' error on 409 and keeps the editor open", async () => {
+      mockedRenameSelf.mockResolvedValue({ ok: false, error: "Name is taken", status: 409 });
+
+      render(<You />);
+
+      await waitFor(() => expect(screen.getAllByText("You").length).toBeGreaterThan(0));
+
+      fireEvent.click(screen.getByRole("button", { name: /edit name/i }));
+      const input = screen.getByRole("textbox") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "Devanshi" } });
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(screen.getByText(/that name's taken/i)).toBeTruthy());
+      // Editor stays open
+      expect(screen.getByRole("textbox")).toBeTruthy();
+      expect(mockedSaveName).not.toHaveBeenCalled();
+    });
   });
 });
