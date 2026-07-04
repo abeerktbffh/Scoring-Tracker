@@ -13,6 +13,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   providers: [
     ...(googleEnabled ? [Google({
+      // Auth.js v5 auto-reads AUTH_GOOGLE_ID/SECRET; we use GOOGLE_CLIENT_ID/SECRET,
+      // so pass them explicitly (otherwise client_id is undefined at the OAuth redirect).
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       allowDangerousEmailAccountLinking: false,
       // Google emails are provider-verified → mark the created user verified.
       profile: (p) => ({ id: p.sub, name: p.name, email: p.email, image: p.picture,
