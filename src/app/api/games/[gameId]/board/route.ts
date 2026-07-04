@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { sql } from "@/db/client";
-import { verifyGroupToken } from "@/auth/token";
-import { resolveViewer } from "@/lib/membership";
+import { requireMember } from "@/lib/membership";
+import { GROUP_ID } from "@/lib/group";
 import { computeGameBoard, type DatedGameEntry } from "@/scoring/gameBoard";
 import { isDailyBoardLocked } from "@/scoring/noPeek";
 import { localDateInTz } from "@/lib/day";
@@ -12,22 +11,26 @@ export const runtime = "nodejs";
 
 const WINDOWS: Window[] = ["daily", "weekly", "monthly", "all"];
 
+/**
+ * Group-level access is now gated by session membership (`requireMember`),
+ * not the legacy `group_token` cookie. `requireMember` re-resolves
+ * membership from the DB on every call: no session -> 401, session but not
+ * a member of the group -> 403.
+ */
 export async function GET(
   req: Request,
   { params }: { params: { gameId: string } },
 ) {
-  const token = cookies().get("group_token")?.value;
-  const payload = token ? await verifyGroupToken(token) : null;
-  if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const groupId = payload.groupId;
+  const guard = await requireMember();
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
+  const groupId = GROUP_ID;
   const gameId = params.gameId;
 
   const param = new URL(req.url).searchParams.get("window");
   const window: Window = WINDOWS.includes(param as Window) ? (param as Window) : "daily";
   // Viewer is resolved from the session, not a client-supplied param — used
   // only for no-peek (restricts, never widens).
-  const viewer = await resolveViewer();
-  const viewerPlayerId = viewer?.player?.id ?? null;
+  const viewerPlayerId = guard.viewer.player?.id ?? null;
 
   const groupRows = (await sql`SELECT timezone FROM groups WHERE id = ${groupId}`) as {
     timezone: string;
