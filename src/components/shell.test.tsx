@@ -15,6 +15,10 @@ vi.mock("@/lib/api", () => ({
   getGames: vi.fn(),
 }));
 
+vi.mock("next-auth/react", () => ({
+  signIn: vi.fn(),
+}));
+
 const mockedGetGames = vi.mocked(getGames);
 
 beforeEach(() => {
@@ -32,6 +36,13 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }));
+
+  // SignInGate (rendered when signed out) probes Auth.js's providers endpoint
+  // on mount to decide whether to show the Google button.
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
+  }) as unknown as typeof fetch;
 });
 
 afterEach(() => {
@@ -122,7 +133,7 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    await waitFor(() => expect(screen.getByLabelText(/group passphrase/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/^email$/i)).toBeTruthy());
     expect(screen.queryByText("secret content")).toBeNull();
   });
 
