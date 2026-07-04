@@ -63,7 +63,10 @@ export async function POST(req: Request) {
     const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
     if (!displayName) return NextResponse.json({ error: "displayName required" }, { status: 400 });
 
-    const player = await createFreshPlayer(userId, GROUP_ID, displayName);
+    const result = await createFreshPlayer(userId, GROUP_ID, displayName);
+    if (!result.ok) {
+      return NextResponse.json({ error: "That name is taken — pick another." }, { status: 409 });
+    }
 
     // The session/JWT never carries email (only `id`) — look it up fresh
     // from the DB, the same source of truth `resolveViewer` uses.
@@ -80,7 +83,7 @@ export async function POST(req: Request) {
     // e.g. when the actor was already a member).
     await clearEligibility(userId);
 
-    return NextResponse.json({ ok: true, player });
+    return NextResponse.json({ ok: true, player: { id: result.id } });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

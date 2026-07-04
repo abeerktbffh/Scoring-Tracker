@@ -100,4 +100,19 @@ describe("POST /api/admin/players/rename", () => {
     expect(res.status).toBe(409);
     expect(sqlMock).toHaveBeenCalledTimes(2);
   });
+
+  it("checks the name clash case-insensitively via lower(display_name)", async () => {
+    requireAdminMock.mockResolvedValue(ADMIN_VIEWER);
+    sqlMock
+      .mockResolvedValueOnce([{ id: "p1" }]) // player exists
+      .mockResolvedValueOnce([{ id: "p2" }]); // name clash (case-insensitive)
+
+    const res = await POST(jsonRequest({ playerId: "p1", newName: "abeer" }));
+    expect(res.status).toBe(409);
+
+    const clashCall = sqlMock.mock.calls[1];
+    const [strings] = clashCall as [TemplateStringsArray, ...unknown[]];
+    expect(strings.join("")).toContain("lower(display_name)");
+    expect(strings.join("")).toContain("lower(");
+  });
 });

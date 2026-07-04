@@ -222,18 +222,41 @@ export async function archivePlayer(playerId: string, _adminUserId: string): Pro
   await sql`UPDATE players SET archived = true WHERE id = ${playerId}`;
 }
 
-/** Creates a brand-new player already linked to a user (no legacy history to claim). */
+/**
+ * Creates a brand-new player already linked to a user (no legacy history to claim).
+ *
+ * Display names must be unique per group case-insensitively. A pre-check
+ * catches the common case with a clean, 409-able result; the INSERT is still
+ * wrapped to catch the `players_group_lower_name_uq` unique-index violation
+ * as a race backstop (same pattern as `createPendingClaim`/`approveClaim`),
+ * so a concurrent request can never surface as a raw 500.
+ */
 export async function createFreshPlayer(
   userId: string,
   groupId: string,
   displayName: string,
-): Promise<{ id: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; reason: "name-taken" }> {
+  const existingRows = (await sql`
+    SELECT id FROM players WHERE group_id = ${groupId} AND lower(display_name) = lower(${displayName})
+  `) as { id: string }[];
+  if (existingRows.length > 0) {
+    return { ok: false, reason: "name-taken" };
+  }
+
   const id = newId("plyr");
-  await sql`
-    INSERT INTO players (id, group_id, display_name, user_id)
-    VALUES (${id}, ${groupId}, ${displayName}, ${userId})
-  `;
-  return { id };
+  try {
+    await sql`
+      INSERT INTO players (id, group_id, display_name, user_id)
+      VALUES (${id}, ${groupId}, ${displayName}, ${userId})
+    `;
+  } catch (err) {
+    if (isUniqueViolation(err, "players_group_lower_name_uq")) {
+      return { ok: false, reason: "name-taken" };
+    }
+    throw err;
+  }
+
+  return { ok: true, id };
 }
 
 /** True iff the group still has unclaimed, unarchived legacy players to migrate. */
