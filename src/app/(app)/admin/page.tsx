@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   getPlayers,
   postAdminGame,
-  renamePlayer,
   getPendingClaims,
   decideClaim,
   createInvite,
@@ -49,8 +48,6 @@ export default function Admin(): JSX.Element {
   const [rememberedName, setRememberedName] = useState<string | null>(null);
 
   const [playersState, setPlayersState] = useState<PlayersState>({ status: "loading" });
-  const [editedNames, setEditedNames] = useState<Record<string, string>>({});
-  const [renameFeedback, setRenameFeedback] = useState<Record<string, string>>({});
 
   const [gameForm, setGameForm] = useState<NewGameForm>(EMPTY_GAME_FORM);
   const [gameSubmitting, setGameSubmitting] = useState(false);
@@ -73,9 +70,6 @@ export default function Admin(): JSX.Element {
         return;
       }
       setPlayersState({ status: "ready", players: result.data.players });
-      setEditedNames(
-        Object.fromEntries(result.data.players.map((p) => [p.id, p.displayName]))
-      );
     });
   }, []);
 
@@ -115,25 +109,6 @@ export default function Admin(): JSX.Element {
       setGameForm(EMPTY_GAME_FORM);
     } else {
       setGameError(result.error);
-    }
-  }
-
-  async function handleRename(playerId: string) {
-    const newName = editedNames[playerId] ?? "";
-    setRenameFeedback((prev) => ({ ...prev, [playerId]: "" }));
-    const result = await renamePlayer(playerId, newName);
-    if (result.ok) {
-      setRenameFeedback((prev) => ({ ...prev, [playerId]: "Renamed." }));
-      setPlayersState((prev) =>
-        prev.status === "ready"
-          ? {
-              status: "ready",
-              players: prev.players.map((p) => (p.id === playerId ? { ...p, displayName: newName } : p)),
-            }
-          : prev
-      );
-    } else {
-      setRenameFeedback((prev) => ({ ...prev, [playerId]: result.error }));
     }
   }
 
@@ -333,21 +308,7 @@ export default function Admin(): JSX.Element {
           {playersState.status === "ready" &&
             playersState.players.map((player) => (
               <div key={player.id} className={styles.playerRow}>
-                <input
-                  className={styles.playerInput}
-                  type="text"
-                  aria-label={`Name for ${player.displayName}`}
-                  value={editedNames[player.id] ?? ""}
-                  onChange={(e) =>
-                    setEditedNames((prev) => ({ ...prev, [player.id]: e.target.value }))
-                  }
-                />
-                <Button variant="ghost" onClick={() => handleRename(player.id)}>
-                  Rename
-                </Button>
-                {renameFeedback[player.id] && (
-                  <span className={styles.success}>{renameFeedback[player.id]}</span>
-                )}
+                <span>{player.displayName}</span>
               </div>
             ))}
         </Card>

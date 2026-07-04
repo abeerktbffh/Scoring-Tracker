@@ -6,7 +6,6 @@ import Admin from "@/app/(app)/admin/page";
 import {
   getPlayers,
   postAdminGame,
-  renamePlayer,
   getPendingClaims,
   decideClaim,
   createInvite,
@@ -17,7 +16,6 @@ import type { Player } from "@/lib/api";
 vi.mock("@/lib/api", () => ({
   getPlayers: vi.fn(),
   postAdminGame: vi.fn(),
-  renamePlayer: vi.fn(),
   getPendingClaims: vi.fn(),
   decideClaim: vi.fn(),
   createInvite: vi.fn(),
@@ -29,7 +27,6 @@ vi.mock("@/lib/rememberMe", () => ({
 
 const mockedGetPlayers = vi.mocked(getPlayers);
 const mockedPostAdminGame = vi.mocked(postAdminGame);
-const mockedRenamePlayer = vi.mocked(renamePlayer);
 const mockedGetPendingClaims = vi.mocked(getPendingClaims);
 const mockedDecideClaim = vi.mocked(decideClaim);
 const mockedCreateInvite = vi.mocked(createInvite);
@@ -43,7 +40,6 @@ const players: Player[] = [
 beforeEach(() => {
   mockedGetPlayers.mockReset();
   mockedPostAdminGame.mockReset();
-  mockedRenamePlayer.mockReset();
   mockedGetPendingClaims.mockReset();
   mockedDecideClaim.mockReset();
   mockedCreateInvite.mockReset();
@@ -62,14 +58,14 @@ describe("Admin", () => {
   it("renders the players list from getPlayers", async () => {
     render(<Admin />);
 
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
-    expect(screen.getByDisplayValue("Devanshi")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
+    expect(screen.getByText("Devanshi")).toBeTruthy();
   });
 
   it("does not render an admin passphrase field", async () => {
     render(<Admin />);
 
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
     expect(screen.queryByLabelText(/admin passphrase/i)).toBeNull();
   });
 
@@ -80,7 +76,7 @@ describe("Admin", () => {
     });
 
     render(<Admin />);
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText(/^game id$/i), { target: { value: "pips" } });
     fireEvent.change(screen.getByLabelText(/^game name$/i), { target: { value: "Pips" } });
@@ -109,7 +105,7 @@ describe("Admin", () => {
     mockedPostAdminGame.mockResolvedValue({ ok: false, error: "Not allowed.", status: 403 });
 
     render(<Admin />);
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText(/^game id$/i), { target: { value: "pips" } });
     fireEvent.change(screen.getByLabelText(/^game name$/i), { target: { value: "Pips" } });
@@ -119,27 +115,11 @@ describe("Admin", () => {
     await waitFor(() => expect(screen.getByText("Not allowed.")).toBeTruthy());
   });
 
-  it("edits a player's name and calls renamePlayer with the id and new name (no passphrase)", async () => {
-    mockedRenamePlayer.mockResolvedValue({ ok: true, data: { ok: true } });
-
-    render(<Admin />);
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
-
-    const nameInput = screen.getByDisplayValue("DJ");
-    fireEvent.change(nameInput, { target: { value: "DJ Renamed" } });
-
-    fireEvent.click(screen.getAllByRole("button", { name: /rename/i })[0]);
-
-    await waitFor(() =>
-      expect(mockedRenamePlayer).toHaveBeenCalledWith("p1", "DJ Renamed")
-    );
-  });
-
   it("hides the pending claims section when there are no pending claims", async () => {
     mockedGetPendingClaims.mockResolvedValue({ ok: true, data: { claims: [] } });
 
     render(<Admin />);
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
 
     expect(screen.queryByText(/pending claims/i)).toBeNull();
   });
@@ -165,8 +145,8 @@ describe("Admin", () => {
     render(<Admin />);
 
     await waitFor(() => expect(screen.getByText(/pending claims/i)).toBeTruthy());
-    expect(screen.getByText("DJ")).toBeTruthy();
     expect(screen.getByText("dj@example.com")).toBeTruthy();
+    expect(screen.getByText("dj@example.com").parentElement?.textContent).toContain("DJ");
 
     // list refreshes to empty after approval, so the section self-retires
     mockedGetPendingClaims.mockResolvedValue({ ok: true, data: { claims: [] } });
@@ -214,7 +194,7 @@ describe("Admin", () => {
     });
 
     render(<Admin />);
-    await waitFor(() => expect(screen.getByDisplayValue("DJ")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: /generate invite/i }));
 

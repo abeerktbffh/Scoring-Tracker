@@ -169,13 +169,6 @@ export function postAdminGame(game: NewGameInput): Promise<ApiResult<{ game: Gam
   return request("/api/admin/games", jsonPost(game));
 }
 
-export function renamePlayer(
-  playerId: string,
-  newName: string
-): Promise<ApiResult<{ ok: true }>> {
-  return request("/api/admin/players/rename", jsonPost({ playerId, newName }));
-}
-
 export function renameSelf(
   newName: string
 ): Promise<ApiResult<{ ok: true; displayName: string }>> {
