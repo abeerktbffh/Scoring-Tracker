@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import type { Theme } from "@/design/theme";
 import styles from "./Drawer.module.css";
 
@@ -54,10 +55,15 @@ export function Drawer({ open, onClose, theme, setTheme }: DrawerProps): JSX.Ele
           </button>
         </div>
 
-        {/* Sign out is intentionally omitted: group_token is httpOnly, so it
-            cannot be cleared from client JS, and adding a logout API route is
-            out of scope for this workstream. Real sign-out lands with the
-            upcoming identity-rebuild sub-project. */}
+        <div className={styles.section}>
+          <button
+            type="button"
+            className={styles.item}
+            onClick={() => signOut({ callbackUrl: "/" })}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </>
   );

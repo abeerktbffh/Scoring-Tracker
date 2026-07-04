@@ -1,7 +1,14 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
-import { getPlayers, postAdminGame, renamePlayer } from "@/lib/api";
-import type { Player } from "@/lib/api";
+import {
+  getPlayers,
+  postAdminGame,
+  renamePlayer,
+  getPendingClaims,
+  decideClaim,
+  createInvite,
+} from "@/lib/api";
+import type { Player, PendingClaim, ClaimDecision } from "@/lib/api";
 import { loadName } from "@/lib/rememberMe";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -14,6 +21,11 @@ type PlayersState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; players: Player[] };
+
+type ClaimsState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ready"; claims: PendingClaim[] };
 
 interface NewGameForm {
   id: string;
@@ -34,7 +46,6 @@ const EMPTY_GAME_FORM: NewGameForm = {
 };
 
 export default function Admin(): JSX.Element {
-  const [adminPassphrase, setAdminPassphrase] = useState("");
   const [rememberedName, setRememberedName] = useState<string | null>(null);
 
   const [playersState, setPlayersState] = useState<PlayersState>({ status: "loading" });
@@ -45,6 +56,14 @@ export default function Admin(): JSX.Element {
   const [gameSubmitting, setGameSubmitting] = useState(false);
   const [gameError, setGameError] = useState<string | null>(null);
   const [gameSuccess, setGameSuccess] = useState<string | null>(null);
+
+  const [claimsState, setClaimsState] = useState<ClaimsState>({ status: "loading" });
+  const [claimFeedback, setClaimFeedback] = useState<Record<string, string>>({});
+
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteGenerating, setInviteGenerating] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const loadPlayers = useCallback(() => {
     setPlayersState({ status: "loading" });
@@ -60,17 +79,29 @@ export default function Admin(): JSX.Element {
     });
   }, []);
 
+  const loadClaims = useCallback(() => {
+    setClaimsState({ status: "loading" });
+    getPendingClaims().then((result) => {
+      if (!result.ok) {
+        setClaimsState({ status: "error", message: result.error });
+        return;
+      }
+      setClaimsState({ status: "ready", claims: result.data.claims });
+    });
+  }, []);
+
   useEffect(() => {
     setRememberedName(loadName());
     loadPlayers();
-  }, [loadPlayers]);
+    loadClaims();
+  }, [loadPlayers, loadClaims]);
 
   async function handleAddGame(e: React.FormEvent) {
     e.preventDefault();
     setGameError(null);
     setGameSuccess(null);
     setGameSubmitting(true);
-    const result = await postAdminGame(adminPassphrase, {
+    const result = await postAdminGame({
       id: gameForm.id,
       name: gameForm.name,
       type: gameForm.type,
@@ -90,7 +121,7 @@ export default function Admin(): JSX.Element {
   async function handleRename(playerId: string) {
     const newName = editedNames[playerId] ?? "";
     setRenameFeedback((prev) => ({ ...prev, [playerId]: "" }));
-    const result = await renamePlayer(adminPassphrase, playerId, newName);
+    const result = await renamePlayer(playerId, newName);
     if (result.ok) {
       setRenameFeedback((prev) => ({ ...prev, [playerId]: "Renamed." }));
       setPlayersState((prev) =>
@@ -106,24 +137,91 @@ export default function Admin(): JSX.Element {
     }
   }
 
+  async function handleClaimDecision(claimId: string, decision: ClaimDecision) {
+    setClaimFeedback((prev) => ({ ...prev, [claimId]: "" }));
+    const result = await decideClaim(claimId, decision);
+    if (result.ok) {
+      loadClaims();
+    } else {
+      setClaimFeedback((prev) => ({ ...prev, [claimId]: result.error }));
+    }
+  }
+
+  async function handleGenerateInvite() {
+    setInviteError(null);
+    setInviteCopied(false);
+    setInviteGenerating(true);
+    const result = await createInvite();
+    setInviteGenerating(false);
+    if (result.ok) {
+      setInviteLink(result.data.link);
+    } else {
+      setInviteError(result.error);
+    }
+  }
+
+  async function handleCopyInvite() {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setInviteCopied(true);
+    } catch {
+      setInviteCopied(false);
+    }
+  }
+
   return (
     <div className={styles.wrap}>
       <h1 className={styles.pageTitle}>Admin</h1>
 
+      {claimsState.status === "ready" && claimsState.claims.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Pending claims</h2>
+          <Card>
+            {claimsState.claims.map((claim) => (
+              <div key={claim.id} className={styles.playerRow}>
+                <div className={styles.claimInfo}>
+                  <span>{claim.playerDisplayName}</span>
+                  <span className={styles.settingsNote}>{claim.claimedByEmail}</span>
+                </div>
+                <Button variant="primary" onClick={() => handleClaimDecision(claim.id, "approve")}>
+                  Approve
+                </Button>
+                <Button variant="ghost" onClick={() => handleClaimDecision(claim.id, "reject")}>
+                  Reject
+                </Button>
+                {claimFeedback[claim.id] && (
+                  <span className={styles.error}>{claimFeedback[claim.id]}</span>
+                )}
+              </div>
+            ))}
+          </Card>
+        </section>
+      )}
+
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Admin passphrase</h2>
+        <h2 className={styles.sectionTitle}>Invites</h2>
         <Card>
-          <label className={styles.label} htmlFor="admin-passphrase">
-            Admin passphrase
-          </label>
-          <input
-            id="admin-passphrase"
-            className={styles.input}
-            type="password"
-            autoComplete="off"
-            value={adminPassphrase}
-            onChange={(e) => setAdminPassphrase(e.target.value)}
-          />
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleGenerateInvite}
+            disabled={inviteGenerating}
+          >
+            {inviteGenerating ? "Generating…" : "Generate invite"}
+          </Button>
+          {inviteError && <p className={styles.error}>{inviteError}</p>}
+          {inviteLink && (
+            <div className={styles.inviteResult}>
+              <p className={styles.settingsNote}>
+                Copy this link now — it won&rsquo;t be shown again.
+              </p>
+              <code className={styles.inviteLink}>{inviteLink}</code>
+              <Button type="button" variant="ghost" onClick={handleCopyInvite}>
+                {inviteCopied ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          )}
         </Card>
       </section>
 

@@ -6,6 +6,7 @@ import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { AppShell } from "./AppShell";
 import { getGames } from "@/lib/api";
+import { signOut } from "next-auth/react";
 
 const mockSearchParams = new URLSearchParams();
 
@@ -20,9 +21,11 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("next-auth/react", () => ({
   signIn: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 const mockedGetGames = vi.mocked(getGames);
+const mockedSignOut = vi.mocked(signOut);
 
 function findPostCall(
   fetchMock: ReturnType<typeof vi.fn>,
@@ -110,11 +113,19 @@ describe("TabBar", () => {
 });
 
 describe("Drawer", () => {
-  it("does not show a Sign out control, but shows a theme toggle when open", () => {
+  it("shows a Sign out control and a theme toggle when open", () => {
     render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
 
-    expect(screen.queryByText(/sign out/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
+  });
+
+  it("calls signOut when Sign out is clicked", () => {
+    render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+
+    expect(mockedSignOut).toHaveBeenCalledWith({ callbackUrl: "/" });
   });
 
   it("calls setTheme with the opposite theme when the toggle is clicked", () => {
