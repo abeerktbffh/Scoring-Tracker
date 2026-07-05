@@ -12,7 +12,10 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   const viewer = await resolveViewer();
   // "Member" of the global board = an authenticated user who has picked a name.
-  return NextResponse.json({ alreadyMember: viewer?.displayName != null });
+  return NextResponse.json({
+    alreadyMember: viewer?.displayName != null,
+    isSuperAdmin: viewer?.isSuperAdmin ?? false,
+  });
 }
 
 export async function POST(req: Request) {

@@ -9,9 +9,10 @@ export interface DrawerProps {
   onClose: () => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
+  isSuperAdmin?: boolean;
 }
 
-export function Drawer({ open, onClose, theme, setTheme }: DrawerProps): JSX.Element {
+export function Drawer({ open, onClose, theme, setTheme, isSuperAdmin }: DrawerProps): JSX.Element {
   const nextTheme: Theme = theme === "light" ? "dark" : "light";
 
   return (
@@ -29,11 +30,13 @@ export function Drawer({ open, onClose, theme, setTheme }: DrawerProps): JSX.Ele
         aria-modal="true"
         aria-hidden={!open}
       >
-        <div className={styles.section}>
-          <Link href="/admin" className={styles.item} onClick={onClose}>
-            Admin
-          </Link>
-        </div>
+        {isSuperAdmin && (
+          <div className={styles.section}>
+            <Link href="/admin" className={styles.item} onClick={onClose}>
+              Admin
+            </Link>
+          </div>
+        )}
 
         <div className={styles.section}>
           <p className={styles.heading}>Settings</p>

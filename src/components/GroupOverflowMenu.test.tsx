@@ -58,37 +58,37 @@ describe("GroupOverflowMenu", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("shows Manage group, Invite, and Leave group for an admin board", () => {
+  it("shows Manage, Invite, and Leave for an admin board", () => {
     setBoard({ boardId: adminBoard.id, board: adminBoard });
     render(<GroupOverflowMenu onManage={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /group options/i }));
     const panel = within(screen.getByTestId("menu-panel"));
 
-    expect(panel.getByText(/manage group/i)).toBeTruthy();
+    expect(panel.getByText(/^manage$/i)).toBeTruthy();
     expect(panel.getByText(/^invite$/i)).toBeTruthy();
-    expect(panel.getByText(/leave group/i)).toBeTruthy();
+    expect(panel.getByText(/^leave$/i)).toBeTruthy();
   });
 
-  it("shows only Invite and Leave group for a member board (no Manage)", () => {
+  it("shows only Invite and Leave for a member board (no Manage)", () => {
     setBoard({ boardId: memberBoard.id, board: memberBoard });
     render(<GroupOverflowMenu onManage={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /group options/i }));
     const panel = within(screen.getByTestId("menu-panel"));
 
-    expect(panel.queryByText(/manage group/i)).toBeNull();
+    expect(panel.queryByText(/^manage$/i)).toBeNull();
     expect(panel.getByText(/^invite$/i)).toBeTruthy();
-    expect(panel.getByText(/leave group/i)).toBeTruthy();
+    expect(panel.getByText(/^leave$/i)).toBeTruthy();
   });
 
-  it("calls onManage and closes the menu when Manage group is clicked", () => {
+  it("calls onManage and closes the menu when Manage is clicked", () => {
     const onManage = vi.fn();
     setBoard({ boardId: adminBoard.id, board: adminBoard });
     render(<GroupOverflowMenu onManage={onManage} />);
 
     fireEvent.click(screen.getByRole("button", { name: /group options/i }));
-    fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/manage group/i));
+    fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/^manage$/i));
 
     expect(onManage).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("menu-panel").getAttribute("aria-hidden")).toBe("true");
@@ -163,7 +163,7 @@ describe("GroupOverflowMenu", () => {
     render(<GroupOverflowMenu onManage={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /group options/i }));
-    fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/leave group/i));
+    fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/^leave$/i));
 
     // Confirmation step: leaveGroup should not fire yet.
     expect(mockedLeaveGroup).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe("GroupOverflowMenu", () => {
     render(<GroupOverflowMenu onManage={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /group options/i }));
-    fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/leave group/i));
+    fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/^leave$/i));
     fireEvent.click(within(screen.getByTestId("menu-panel")).getByRole("button", { name: /cancel/i }));
 
     expect(mockedLeaveGroup).not.toHaveBeenCalled();

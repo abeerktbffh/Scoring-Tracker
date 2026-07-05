@@ -22,6 +22,7 @@ export interface AppShellProps {
 
 interface OnboardingState {
   alreadyMember: boolean;
+  isSuperAdmin: boolean;
 }
 
 function activeFromPathname(pathname: string | null): string {
@@ -141,6 +142,7 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
         theme={theme}
         setTheme={setTheme}
         pathname={pathname}
+        isSuperAdmin={onboarding?.isSuperAdmin ?? false}
       >
         {children}
       </ShellContent>
@@ -159,6 +161,7 @@ interface ShellContentProps {
   theme: Theme;
   setTheme: (t: Theme) => void;
   pathname: string | null;
+  isSuperAdmin: boolean;
 }
 
 // Rendered inside BoardProvider so it (and the overlays it mounts) can call useBoard().
@@ -173,6 +176,7 @@ function ShellContent({
   theme,
   setTheme,
   pathname,
+  isSuperAdmin,
 }: ShellContentProps): JSX.Element {
   const board = useBoard();
   const searchParams = useSearchParams();
@@ -212,6 +216,7 @@ function ShellContent({
         onClose={() => setDrawerOpen(false)}
         theme={theme}
         setTheme={setTheme}
+        isSuperAdmin={isSuperAdmin}
       />
 
       <CreateGroup

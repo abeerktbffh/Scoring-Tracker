@@ -187,6 +187,70 @@ describe("Home", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /log today's puzzle/i })).toBeTruthy());
   });
 
+  describe("group-aware empty state", () => {
+    it("shows a group-specific empty state when the selected group tracks no games", async () => {
+      setBoard("g1");
+      mockedGetMe.mockResolvedValue({
+        ok: true,
+        data: { ...meResponse, today: { ...meResponse.today, loggedCount: 0, totalCount: 0, games: [] } },
+      });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: [] },
+      });
+
+      render(<Home />);
+
+      await waitFor(() => expect(screen.getByText(/no games tracked/i)).toBeTruthy());
+      expect(screen.getByText(/this group isn't tracking any games yet/i)).toBeTruthy();
+      expect(screen.queryByText(/nothing logged yet/i)).toBeNull();
+      expect(screen.queryByRole("button", { name: /log today's puzzle/i })).toBeNull();
+    });
+
+    it("shows the Today card (not the full empty state) for a group that tracks games but the viewer hasn't logged today", async () => {
+      setBoard("g1");
+      mockedGetMe.mockResolvedValue({
+        ok: true,
+        data: {
+          ...meResponse,
+          today: {
+            ...meResponse.today,
+            loggedCount: 0,
+            games: meResponse.today.games.map((g) => ({ ...g, logged: false })),
+          },
+        },
+      });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: [] },
+      });
+
+      const { container } = render(<Home />);
+
+      await waitFor(() => expect(container.textContent).toMatch(/0\s*of\s*5/i));
+      expect(screen.queryByText(/nothing logged yet/i)).toBeNull();
+      expect(screen.queryByText(/no games tracked/i)).toBeNull();
+    });
+
+    it("keeps the existing global first-run copy when the global board's catalog is empty", async () => {
+      setBoard(null);
+      mockedLoadName.mockReturnValue(null);
+      mockedGetMe.mockResolvedValue({
+        ok: true,
+        data: { ...meResponse, today: { ...meResponse.today, loggedCount: 0, totalCount: 0, games: [] } },
+      });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: [] },
+      });
+
+      render(<Home />);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: /log today's puzzle/i })).toBeTruthy());
+      expect(screen.getByText(/nothing logged yet/i)).toBeTruthy();
+    });
+  });
+
   describe("board scoping", () => {
     beforeEach(() => {
       mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });

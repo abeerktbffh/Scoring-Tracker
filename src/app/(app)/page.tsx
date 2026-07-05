@@ -89,7 +89,15 @@ export default function Home(): JSX.Element {
       {state.status === "error" && <ErrorState message={state.message} onRetry={handleRetry} />}
 
       {state.status === "ready" && (
-        <HomeReady me={state.me} rows={state.rows} name={name} sortKey={sortKey} onSort={setSortKey} onLog={goToLog} />
+        <HomeReady
+          me={state.me}
+          rows={state.rows}
+          name={name}
+          sortKey={sortKey}
+          onSort={setSortKey}
+          onLog={goToLog}
+          isGroup={boardId !== null}
+        />
       )}
     </div>
   );
@@ -102,12 +110,21 @@ interface HomeReadyProps {
   sortKey: LeaderboardSortKey;
   onSort: (key: LeaderboardSortKey) => void;
   onLog: () => void;
+  isGroup: boolean;
 }
 
-function HomeReady({ me, rows, name, sortKey, onSort, onLog }: HomeReadyProps): JSX.Element {
-  const isEmpty = !name || (me.today.totalCount === 0 && rows.length === 0);
-
-  if (isEmpty) {
+function HomeReady({ me, rows, name, sortKey, onSort, onLog, isGroup }: HomeReadyProps): JSX.Element {
+  // totalCount reflects how many games the board tracks (group-tracked-active
+  // games for a group; the catalog for the global board) — not whether the
+  // viewer has logged anything. Only an empty catalog/tracking list is a true
+  // "empty" state; a member who simply hasn't logged today still sees the
+  // Today card + board.
+  if (me.today.totalCount === 0) {
+    if (isGroup) {
+      return (
+        <EmptyState title="No games tracked" body="This group isn't tracking any games yet." />
+      );
+    }
     return (
       <EmptyState
         title="Nothing logged yet"

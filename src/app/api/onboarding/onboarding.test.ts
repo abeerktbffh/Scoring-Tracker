@@ -41,6 +41,7 @@ describe("GET /api/onboarding", () => {
     const res = await GET();
     const body = await res.json();
     expect(body.alreadyMember).toBe(true);
+    expect(body.isSuperAdmin).toBe(false);
   });
 
   it("reports alreadyMember=false when the viewer has no display name", async () => {
@@ -50,6 +51,15 @@ describe("GET /api/onboarding", () => {
     const res = await GET();
     const body = await res.json();
     expect(body.alreadyMember).toBe(false);
+  });
+
+  it("reports isSuperAdmin=true when the viewer is a super admin", async () => {
+    authMock.mockResolvedValue({ user: { id: "u7" } });
+    resolveViewerMock.mockResolvedValue({ userId: "u7", displayName: "Admin", isSuperAdmin: true });
+
+    const res = await GET();
+    const body = await res.json();
+    expect(body.isSuperAdmin).toBe(true);
   });
 });
 
