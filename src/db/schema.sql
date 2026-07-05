@@ -151,3 +151,8 @@ ALTER TABLE groups ADD COLUMN IF NOT EXISTS created_by TEXT REFERENCES users(id)
 CREATE UNIQUE INDEX IF NOT EXISTS entries_active_uq
   ON entries (user_id, game_id, puzzle_date, COALESCE(variant, ''))
   WHERE superseded_by IS NULL;
+
+-- Phase 1 cutover prerequisites: relax legacy NOT NULLs so user-scoped writes and global catalog inserts are valid
+ALTER TABLE entries ALTER COLUMN group_id DROP NOT NULL;
+ALTER TABLE entries ALTER COLUMN player_id DROP NOT NULL;
+ALTER TABLE games ALTER COLUMN group_id DROP NOT NULL;
