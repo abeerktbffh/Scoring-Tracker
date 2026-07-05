@@ -5,7 +5,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { AppShell } from "./AppShell";
-import { getGames, listMyGroups } from "@/lib/api";
+import { getGames, listMyGroups, createGroup, getGroupInvite, leaveGroup } from "@/lib/api";
 import { signOut } from "next-auth/react";
 
 const mockSearchParams = new URLSearchParams();
@@ -15,9 +15,17 @@ vi.mock("next/navigation", () => ({
   useSearchParams: vi.fn(() => mockSearchParams),
 }));
 
+// The authed shell mounts BoardSwitcher, GroupOverflowMenu, and CreateGroup (inside
+// BoardProvider) regardless of which board is selected, so every group-related fn
+// they import from @/lib/api at module load must be stubbed here, even ones a given
+// test never exercises — otherwise "X is not a function" surfaces the moment a test
+// opens an overlay that calls it.
 vi.mock("@/lib/api", () => ({
   getGames: vi.fn(),
   listMyGroups: vi.fn(),
+  createGroup: vi.fn(),
+  getGroupInvite: vi.fn(),
+  leaveGroup: vi.fn(),
 }));
 
 vi.mock("@/lib/currentBoard", () => ({
@@ -32,6 +40,9 @@ vi.mock("next-auth/react", () => ({
 
 const mockedGetGames = vi.mocked(getGames);
 const mockedListMyGroups = vi.mocked(listMyGroups);
+const mockedCreateGroup = vi.mocked(createGroup);
+const mockedGetGroupInvite = vi.mocked(getGroupInvite);
+const mockedLeaveGroup = vi.mocked(leaveGroup);
 const mockedSignOut = vi.mocked(signOut);
 
 function findPostCall(
@@ -90,6 +101,19 @@ beforeEach(() => {
 
   // BoardProvider (mounted for the authed shell subtree) fetches groups on mount.
   mockedListMyGroups.mockResolvedValue({ ok: true, data: { groups: [] } });
+
+  // CreateGroup / GroupOverflowMenu are always mounted (rendered as null/closed) inside
+  // the authed shell; default their API calls to succeed so opening an overlay never
+  // throws even in tests that don't care about the round-trip.
+  mockedCreateGroup.mockResolvedValue({
+    ok: true,
+    data: { id: "new-group-id", link: "https://example.com/invite/new-group-id" },
+  });
+  mockedGetGroupInvite.mockResolvedValue({
+    ok: true,
+    data: { link: "https://example.com/invite/existing-group" },
+  });
+  mockedLeaveGroup.mockResolvedValue({ ok: true, data: { ok: true } });
 });
 
 afterEach(() => {
@@ -255,5 +279,28 @@ describe("AppShell", () => {
         displayName: "Abeer",
       });
     });
+  });
+
+  it("opens the CreateGroup overlay when 'New group' is chosen from the board switcher", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+    expect(screen.queryByLabelText(/group name/i)).toBeNull();
+
+    // Global board (no groups) — trigger button is titled "Global".
+    fireEvent.click(screen.getByRole("button", { name: /global/i }));
+    fireEvent.click(screen.getByText(/new group/i));
+
+    await waitFor(() => expect(screen.getByLabelText(/group name/i)).toBeTruthy());
+    expect(screen.getByRole("button", { name: /^create$/i })).toBeTruthy();
   });
 });
