@@ -102,6 +102,9 @@ export default function Standings(): JSX.Element {
       // The board changed: the games list is now scoped to the new group,
       // so drop the old selection and let loadGames pick the new first game.
       setSelectedGameId(null);
+      // Also drop any previously-loaded per-game board so a zero-games group
+      // (or the refetch window) doesn't keep showing the old board's table.
+      setBoard({ status: "idle" });
     }
     loadOverall(windowKey, displayName);
     loadGames();

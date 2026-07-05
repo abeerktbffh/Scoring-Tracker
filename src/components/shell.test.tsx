@@ -339,6 +339,39 @@ describe("AppShell", () => {
     expect(screen.getByRole("button", { name: /^create$/i })).toBeTruthy();
   });
 
+  it("keeps the CreateGroup overlay open on the invite-link screen after a successful create, and closes only on Done", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /global/i }));
+    fireEvent.click(screen.getByText(/new group/i));
+
+    await waitFor(() => expect(screen.getByLabelText(/group name/i)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(/group name/i), { target: { value: "Family Night" } });
+    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+
+    // Old (buggy) onCreated closed the overlay immediately, so the invite-link
+    // success screen never had a chance to render. It must stay mounted here.
+    await waitFor(() =>
+      expect(screen.getByText("https://example.com/invite/new-group-id")).toBeTruthy()
+    );
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^done$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
   it("does not render the JoinGroup overlay when no ?join= token is present", async () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     global.fetch = mockFetchWithOnboarding({

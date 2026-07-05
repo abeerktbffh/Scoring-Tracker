@@ -218,9 +218,7 @@ function ShellContent({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={(id) => {
-          board.select(id);
-          board.refresh();
-          setCreateOpen(false);
+          board.refresh().then(() => board.select(id));
         }}
       />
 

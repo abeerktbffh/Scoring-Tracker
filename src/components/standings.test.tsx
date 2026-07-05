@@ -171,5 +171,72 @@ describe("Standings", () => {
 
       await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g2"));
     });
+
+    it("does not keep showing the previous board's game table while the new board's own board is still loading", async () => {
+      setBoard("g1");
+      const staleRows: GameBoardRow[] = [
+        { displayName: "StaleG1Player", wins: 1, gamesPlayed: 1, bestValue: 1, currentStreak: 1, longestStreak: 1 },
+      ];
+      mockedGetBoard.mockResolvedValue({
+        ok: true,
+        data: { gameId: "wordle", window: "weekly", locked: false, players: staleRows },
+      });
+
+      const { rerender } = render(<Standings />);
+      await waitFor(() => expect(screen.getByText("StaleG1Player")).toBeTruthy());
+
+      // Switch to a board that tracks a different (nonzero) set of games, but delay
+      // its getBoard response so the old board would still be "ready" if it weren't reset.
+      const gamesG2: Game[] = [
+        {
+          id: "connections",
+          name: "Connections",
+          type: "outcome",
+          metricDirection: "lower_better",
+          hasVariants: false,
+        },
+      ];
+      mockedGetGames.mockResolvedValue({ ok: true, data: { games: gamesG2 } });
+      let resolveBoard: (value: Awaited<ReturnType<typeof getBoard>>) => void = () => {};
+      mockedGetBoard.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveBoard = resolve;
+          })
+      );
+
+      setBoard("g2");
+      rerender(<Standings />);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Connections" })).toBeTruthy());
+      // The new group's board hasn't resolved yet — the old group's stale rows must not show.
+      expect(screen.queryByText("StaleG1Player")).toBeNull();
+
+      resolveBoard({
+        ok: true,
+        data: { gameId: "connections", window: "weekly", locked: false, players: [] },
+      });
+    });
+
+    it("shows 'No games yet' instead of a stale board when switching to a board with zero tracked games", async () => {
+      setBoard("g1");
+      const staleRows: GameBoardRow[] = [
+        { displayName: "StaleG1Player", wins: 1, gamesPlayed: 1, bestValue: 1, currentStreak: 1, longestStreak: 1 },
+      ];
+      mockedGetBoard.mockResolvedValue({
+        ok: true,
+        data: { gameId: "wordle", window: "weekly", locked: false, players: staleRows },
+      });
+
+      const { rerender } = render(<Standings />);
+      await waitFor(() => expect(screen.getByText("StaleG1Player")).toBeTruthy());
+
+      mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+      setBoard("g2");
+      rerender(<Standings />);
+
+      await waitFor(() => expect(screen.getByText(/no games yet/i)).toBeTruthy());
+      expect(screen.queryByText("StaleG1Player")).toBeNull();
+    });
   });
 });
