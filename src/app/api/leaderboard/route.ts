@@ -79,10 +79,19 @@ export async function GET(req: Request) {
   // No-peek is a UX/fairness aid, not a security boundary. The viewer is
   // resolved from the session (never a client param); with no session user,
   // treat the viewer as having played nothing (locked).
+  //
+  // "Played today" is a GLOBAL fact about the viewer, independent of which
+  // games a group tracks — derived from a dedicated query keyed only on the
+  // viewer's own user_id, never from the (possibly group-filtered) `rows`.
+  // Otherwise a member who played only a game the group doesn't track would
+  // be wrongly locked on that group's leaderboard.
   if (window === "daily") {
-    const playedGameIds = new Set(
-      rows.filter((r) => r.user_id === viewerUserId).map((r) => r.game_id),
-    );
+    const playedRows = (await sql`
+      SELECT DISTINCT game_id FROM entries
+      WHERE user_id = ${viewerUserId} AND puzzle_date = ${today}::date
+        AND superseded_by IS NULL AND is_late = false
+    `) as { game_id: string }[];
+    const playedGameIds = new Set(playedRows.map((r) => r.game_id));
     locked = playedGameIds.size === 0;
     visibleRows = rows.filter((r) => playedGameIds.has(r.game_id));
   }

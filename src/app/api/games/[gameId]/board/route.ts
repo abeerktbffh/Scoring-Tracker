@@ -79,9 +79,18 @@ export async function GET(
 
   // No-peek is a UX/fairness aid, not a security boundary. The viewer is
   // resolved from the session (never a client param).
-  const playedToday = rows.some(
-    (r) => r.user_id === viewerUserId && r.puzzle_date === today,
-  );
+  //
+  // "Played today" is a GLOBAL fact about the viewer for this game,
+  // independent of the group members/tracked-games filter applied to `rows`
+  // above — derived from a dedicated query keyed only on the viewer's own
+  // user_id and gameId, never from the (possibly group-filtered) `rows`.
+  const playedRows = (await sql`
+    SELECT 1 FROM entries
+    WHERE user_id = ${viewerUserId} AND game_id = ${gameId} AND puzzle_date = ${today}::date
+      AND superseded_by IS NULL AND is_late = false
+    LIMIT 1
+  `) as unknown[];
+  const playedToday = playedRows.length > 0;
   if (isDailyBoardLocked(window, playedToday)) {
     return NextResponse.json({ gameId, window, locked: true, players: [] });
   }

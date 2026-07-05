@@ -46,6 +46,7 @@ describe("GET /api/games/[gameId]/board", () => {
   it("locks the daily board for a user who hasn't played today", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([]); // no entries at all (no groups lookup anymore)
+    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: no play
 
     const res = await GET(req(), { params: { gameId: "g_wordle" } });
     expect(res.status).toBe(200);
@@ -66,6 +67,7 @@ describe("GET /api/games/[gameId]/board", () => {
         metric_direction: "lower_better",
       },
     ]);
+    sqlMock.mockResolvedValueOnce([{}]); // dedicated played-today query: viewer played
 
     const res = await GET(req(), { params: { gameId: "g_wordle" } });
     expect(res.status).toBe(200);
@@ -107,6 +109,7 @@ describe("GET /api/games/[gameId]/board", () => {
         metric_direction: "lower_better",
       },
     ]);
+    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: viewer played nothing
 
     const res = await GET(req(), { params: { gameId: "g_wordle" } });
     const body = await res.json();
@@ -117,6 +120,7 @@ describe("GET /api/games/[gameId]/board", () => {
   it("uses requireUser and the global query when ?group= is absent", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([]);
+    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query
 
     await GET(req(), { params: { gameId: "g_wordle" } });
     expect(requireUserMock).toHaveBeenCalled();
@@ -148,6 +152,7 @@ describe("GET /api/games/[gameId]/board", () => {
         metric_direction: "lower_better",
       },
     ]);
+    sqlMock.mockResolvedValueOnce([{}]); // dedicated played-today query: viewer played
 
     const res = await GET(req("http://localhost/api/games/g_wordle/board?group=g1"), {
       params: { gameId: "g_wordle" },
@@ -179,6 +184,37 @@ describe("GET /api/games/[gameId]/board", () => {
         metric_direction: "lower_better",
       },
     ]);
+    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: viewer played nothing
+
+    const res = await GET(req("http://localhost/api/games/g_wordle/board?group=g1"), {
+      params: { gameId: "g_wordle" },
+    });
+    const body = await res.json();
+    expect(body).toEqual({ gameId: "g_wordle", window: "daily", locked: true, players: [] });
+  });
+
+  it("unlocks a group-scoped board via the dedicated played-today query even when group-filtered rows contain none of the viewer's plays", async () => {
+    requireMemberMock.mockResolvedValue(USER_VIEWER);
+    // The group-filtered `rows` query is empty (e.g. the group doesn't track
+    // this game) — if `playedToday` were (incorrectly) derived from `rows`,
+    // the viewer would be wrongly locked.
+    sqlMock.mockResolvedValueOnce([]);
+    // The dedicated played-today query is keyed only on the viewer's own
+    // user_id/gameId/date, independent of the group filter, and finds a play.
+    sqlMock.mockResolvedValueOnce([{}]);
+
+    const res = await GET(req("http://localhost/api/games/g_wordle/board?group=g1"), {
+      params: { gameId: "g_wordle" },
+    });
+    const body = await res.json();
+    expect(body.locked).toBe(false);
+    expect(body.players).toEqual([]);
+  });
+
+  it("keeps a group-scoped board locked when the dedicated played-today query finds no global play", async () => {
+    requireMemberMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([]);
+    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: no global play
 
     const res = await GET(req("http://localhost/api/games/g_wordle/board?group=g1"), {
       params: { gameId: "g_wordle" },
