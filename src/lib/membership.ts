@@ -64,3 +64,36 @@ export async function requireUser(): Promise<GuardResult> {
 export async function requireSuperAdmin(): Promise<GuardResult> {
   return toGuardResult(await resolveViewer(), "super-admin");
 }
+
+/** Pure decision function — no I/O — exhaustively unit-testable. */
+export function roleFor(rows: { role: string }[]): "admin" | "member" | null {
+  const r = rows[0]?.role;
+  return r === "admin" || r === "member" ? r : null;
+}
+
+async function resolveGroupRole(
+  groupId: string
+): Promise<{ viewer: Viewer; role: "admin" | "member" | null } | null> {
+  const viewer = await resolveViewer();
+  if (!viewer) return null;
+  const rows = (await sql`
+    SELECT role FROM memberships WHERE group_id = ${groupId} AND user_id = ${viewer.userId}
+  `) as { role: string }[];
+  return { viewer, role: roleFor(rows) };
+}
+
+/** Guard for routes scoped to a group: any member (admin or member) may proceed. */
+export async function requireMember(groupId: string): Promise<GuardResult> {
+  const r = await resolveGroupRole(groupId);
+  if (!r) return { ok: false, status: 401, error: "Unauthenticated" };
+  if (r.role === null) return { ok: false, status: 403, error: "Not a member" };
+  return { ok: true, viewer: r.viewer };
+}
+
+/** Guard for group-admin-only routes (e.g. managing that group's members). */
+export async function requireGroupAdmin(groupId: string): Promise<GuardResult> {
+  const r = await resolveGroupRole(groupId);
+  if (!r) return { ok: false, status: 401, error: "Unauthenticated" };
+  if (r.role !== "admin") return { ok: false, status: 403, error: "Admin only" };
+  return { ok: true, viewer: r.viewer };
+}

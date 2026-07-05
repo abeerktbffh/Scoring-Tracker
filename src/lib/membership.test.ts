@@ -5,7 +5,8 @@ const authMock = vi.fn();
 vi.mock("@/db/client", () => ({ sql: sqlMock }));
 vi.mock("@/auth/config", () => ({ auth: authMock }));
 
-const { resolveViewer, authzResult, requireUser, requireSuperAdmin } = await import("./membership");
+const { resolveViewer, authzResult, requireUser, requireSuperAdmin, roleFor, requireMember, requireGroupAdmin } =
+  await import("./membership");
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -52,5 +53,31 @@ describe("guards", () => {
     sqlMock.mockResolvedValueOnce([{ display_name: "A", is_super_admin: false }]);
     const r = await requireSuperAdmin();
     expect(r).toEqual({ ok: false, status: 403, error: "Admin only" });
+  });
+});
+
+describe("group guards", () => {
+  it("roleFor returns the role or null", () => {
+    expect(roleFor([{ role: "admin" }])).toBe("admin");
+    expect(roleFor([{ role: "member" }])).toBe("member");
+    expect(roleFor([])).toBeNull();
+  });
+  it("requireMember 403s a non-member", async () => {
+    authMock.mockResolvedValue({ user: { id: "u1" } });
+    sqlMock.mockResolvedValueOnce([{ display_name: "A", is_super_admin: false }]); // resolveViewer
+    sqlMock.mockResolvedValueOnce([]); // no membership row
+    const r = await requireMember("g_x");
+    expect(r).toEqual({ ok: false, status: 403, error: "Not a member" });
+  });
+  it("requireGroupAdmin 403s a plain member but allows an admin", async () => {
+    authMock.mockResolvedValue({ user: { id: "u1" } });
+    sqlMock.mockResolvedValueOnce([{ display_name: "A", is_super_admin: false }]);
+    sqlMock.mockResolvedValueOnce([{ role: "member" }]);
+    expect((await requireGroupAdmin("g_x")).ok).toBe(false);
+
+    authMock.mockResolvedValue({ user: { id: "u2" } });
+    sqlMock.mockResolvedValueOnce([{ display_name: "B", is_super_admin: false }]);
+    sqlMock.mockResolvedValueOnce([{ role: "admin" }]);
+    expect((await requireGroupAdmin("g_x")).ok).toBe(true);
   });
 });
