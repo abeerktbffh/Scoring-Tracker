@@ -13,6 +13,7 @@ import { BoardSwitcher } from "./BoardSwitcher";
 import { GroupOverflowMenu } from "./GroupOverflowMenu";
 import { CreateGroup } from "./CreateGroup";
 import { JoinGroup } from "./JoinGroup";
+import { ManageGroup } from "./ManageGroup";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -223,8 +224,18 @@ function ShellContent({
         }}
       />
 
-      {/* ManageGroup overlay: Task 9 */}
-      {manageOpen && null}
+      {manageOpen && board.board && (
+        <ManageGroup
+          groupId={board.board.id}
+          onClose={() => setManageOpen(false)}
+          onChanged={() => board.refresh()}
+          onDeleted={() => {
+            board.select(null);
+            board.refresh();
+            setManageOpen(false);
+          }}
+        />
+      )}
 
       {joinToken && !joinDismissed && (
         <JoinGroup

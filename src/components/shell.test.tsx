@@ -13,6 +13,12 @@ import {
   leaveGroup,
   getGroupPreview,
   joinGroup,
+  getGroupMembers,
+  renameGroup,
+  setGroupGames,
+  removeMember,
+  resetGroupInvite,
+  deleteGroup,
 } from "@/lib/api";
 import { signOut } from "next-auth/react";
 
@@ -36,6 +42,12 @@ vi.mock("@/lib/api", () => ({
   leaveGroup: vi.fn(),
   getGroupPreview: vi.fn(),
   joinGroup: vi.fn(),
+  getGroupMembers: vi.fn(),
+  renameGroup: vi.fn(),
+  setGroupGames: vi.fn(),
+  removeMember: vi.fn(),
+  resetGroupInvite: vi.fn(),
+  deleteGroup: vi.fn(),
 }));
 
 vi.mock("@/lib/currentBoard", () => ({
@@ -56,6 +68,12 @@ const mockedLeaveGroup = vi.mocked(leaveGroup);
 const mockedGetGroupPreview = vi.mocked(getGroupPreview);
 const mockedJoinGroup = vi.mocked(joinGroup);
 const mockedSignOut = vi.mocked(signOut);
+const mockedGetGroupMembers = vi.mocked(getGroupMembers);
+const mockedRenameGroup = vi.mocked(renameGroup);
+const mockedSetGroupGames = vi.mocked(setGroupGames);
+const mockedRemoveMember = vi.mocked(removeMember);
+const mockedResetGroupInvite = vi.mocked(resetGroupInvite);
+const mockedDeleteGroup = vi.mocked(deleteGroup);
 
 function findPostCall(
   fetchMock: ReturnType<typeof vi.fn>,
@@ -366,5 +384,40 @@ describe("AppShell", () => {
     await waitFor(() => expect(screen.queryByText(/join family night\?/i)).toBeNull());
 
     replaceStateSpy.mockRestore();
+  });
+
+  it("opens the ManageGroup overlay from the overflow menu when an admin group is selected", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    mockedGetGroupMembers.mockResolvedValue({ ok: true, data: { members: [] } });
+    mockedListMyGroups.mockResolvedValue({
+      ok: true,
+      data: { groups: [{ id: "g1", name: "Family Game Night", role: "admin" }] },
+    });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+
+    // Select the admin group from the board switcher.
+    fireEvent.click(screen.getByRole("button", { name: /global/i }));
+    fireEvent.click(screen.getByText("Family Game Night"));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /family game night/i })).toBeTruthy()
+    );
+
+    // Open the overflow menu and choose Manage.
+    fireEvent.click(screen.getByRole("button", { name: /group options/i }));
+    fireEvent.click(screen.getByText(/manage group/i));
+
+    await waitFor(() => expect(screen.getByTestId("manage-group-backdrop")).toBeTruthy());
+    expect(mockedGetGroupMembers).toHaveBeenCalledWith("g1");
   });
 });

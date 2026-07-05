@@ -1,0 +1,243 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+}
+
+.panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 41;
+  width: min(400px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--ink);
+  margin: 0 0 var(--space-4);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.section:last-of-type {
+  border-bottom: none;
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+  display: block;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.input {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1.3px solid var(--line);
+  border-radius: var(--r-tile);
+  padding: var(--space-3);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.gameList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.gameItem {
+  margin: 0;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--ink);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.memberList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.memberItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.memberName {
+  flex: 1;
+}
+
+.memberRole {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.removeButton {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+}
+
+.removeButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.error {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--danger);
+  margin: 0;
+}
+
+.link {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--tile-empty);
+  border-radius: var(--r-tile);
+  padding: var(--space-2);
+  word-break: break-all;
+  margin: 0;
+}
+
+.actionButton {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.actionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.copyButton {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.dangerButton {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--danger);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dangerButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmRow {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.cancelButton {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
