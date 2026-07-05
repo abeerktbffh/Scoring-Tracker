@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getLeaderboard, getBoard, getGames } from "@/lib/api";
 import type { OverallRow, GameBoardRow, Game } from "@/lib/api";
-import { loadName } from "@/lib/rememberMe";
 import { useBoard } from "@/components/BoardContext";
 import { sortPlayers } from "@/lib/leaderboardSort";
 import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
@@ -42,7 +41,10 @@ type GamesState =
 
 export default function Standings(): JSX.Element {
   const { boardId } = useBoard();
-  const [name, setName] = useState<string | null>(null);
+  // Viewer identity comes from the server session (leaderboard/board
+  // `viewerName`), never localStorage — a brand-new user has no localStorage
+  // name but is still identified as "me" as soon as the server knows it.
+  const [viewerName, setViewerName] = useState<string | null>(null);
   const [windowKey, setWindowKey] = useState<string>("weekly");
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
   const [overall, setOverall] = useState<OverallState>({ status: "loading" });
@@ -52,14 +54,17 @@ export default function Standings(): JSX.Element {
   const isFirstBoardLoad = useRef(true);
 
   const loadOverall = useCallback(
-    (win: string, displayName: string | null) => {
+    (win: string) => {
       setOverall({ status: "loading" });
-      getLeaderboard(win, displayName ?? undefined, boardId ?? undefined).then((result) => {
+      // The `player` arg is a legacy param the server ignores — viewer
+      // identity is resolved from the session, not a client-supplied value.
+      getLeaderboard(win, undefined, boardId ?? undefined).then((result) => {
         if (!result.ok) {
           setOverall({ status: "error", message: result.error });
           return;
         }
         setOverall({ status: "ready", locked: result.data.locked, rows: result.data.players });
+        setViewerName(result.data.viewerName);
       });
     },
     [boardId]
@@ -80,22 +85,21 @@ export default function Standings(): JSX.Element {
   }, [boardId]);
 
   const loadBoard = useCallback(
-    (gameId: string, win: string, displayName: string | null) => {
+    (gameId: string, win: string) => {
       setBoard({ status: "loading" });
-      getBoard(gameId, win, displayName ?? undefined, boardId ?? undefined).then((result) => {
+      getBoard(gameId, win, undefined, boardId ?? undefined).then((result) => {
         if (!result.ok) {
           setBoard({ status: "error", message: result.error });
           return;
         }
         setBoard({ status: "ready", locked: result.data.locked, rows: result.data.players });
+        setViewerName(result.data.viewerName);
       });
     },
     [boardId]
   );
 
   useEffect(() => {
-    const displayName = loadName();
-    setName(displayName);
     if (isFirstBoardLoad.current) {
       isFirstBoardLoad.current = false;
     } else {
@@ -106,14 +110,14 @@ export default function Standings(): JSX.Element {
       // (or the refetch window) doesn't keep showing the old board's table.
       setBoard({ status: "idle" });
     }
-    loadOverall(windowKey, displayName);
+    loadOverall(windowKey);
     loadGames();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId]);
 
   useEffect(() => {
     if (selectedGameId) {
-      loadBoard(selectedGameId, windowKey, name);
+      loadBoard(selectedGameId, windowKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGameId, windowKey]);
@@ -121,16 +125,16 @@ export default function Standings(): JSX.Element {
   const handleWindowChange = useCallback(
     (k: string) => {
       setWindowKey(k);
-      loadOverall(k, name);
+      loadOverall(k);
     },
-    [loadOverall, name]
+    [loadOverall]
   );
 
-  const handleRetryOverall = useCallback(() => loadOverall(windowKey, name), [loadOverall, windowKey, name]);
+  const handleRetryOverall = useCallback(() => loadOverall(windowKey), [loadOverall, windowKey]);
   const handleRetryGames = useCallback(() => loadGames(), [loadGames]);
   const handleRetryBoard = useCallback(() => {
-    if (selectedGameId) loadBoard(selectedGameId, windowKey, name);
-  }, [loadBoard, selectedGameId, windowKey, name]);
+    if (selectedGameId) loadBoard(selectedGameId, windowKey);
+  }, [loadBoard, selectedGameId, windowKey]);
 
   return (
     <div className={styles.wrap}>
@@ -160,7 +164,7 @@ export default function Standings(): JSX.Element {
             rows={sortPlayers(overall.rows, sortKey)}
             sortKey={sortKey}
             onSort={setSortKey}
-            me={name ?? undefined}
+            me={viewerName ?? undefined}
           />
         )}
       </Card>
@@ -213,7 +217,7 @@ export default function Standings(): JSX.Element {
                 <EmptyState title="No results yet" body="Once this game has results, the board will show up here." />
               )}
               {board.status === "ready" && !board.locked && board.rows.length > 0 && (
-                <GameBoardTable rows={board.rows} me={name ?? undefined} />
+                <GameBoardTable rows={board.rows} me={viewerName ?? undefined} />
               )}
             </Card>
           </>

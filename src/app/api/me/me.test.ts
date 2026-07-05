@@ -52,6 +52,7 @@ describe("GET /api/me", () => {
     expect(body.today.loggedCount).toBe(0);
     expect(body.today.games).toEqual([{ gameId: "g_wordle", name: "Wordle", logged: false }]);
     expect(body.recent).toEqual([]);
+    expect(body.displayName).toBe("Session User");
 
     // Games query drops the group filter — global catalog, active games only.
     const gamesQueryStrings: string[] = sqlMock.mock.calls[0][0];
@@ -65,6 +66,18 @@ describe("GET /api/me", () => {
     expect(entriesQueryStrings.join("")).not.toContain("group_id");
     expect(entriesQueryStrings.join("")).not.toContain("player_id");
     expect(entriesQueryValues).toContain("u1");
+  });
+
+  it("returns displayName: null when the session viewer has no display name yet", async () => {
+    requireUserMock.mockResolvedValue({
+      ok: true,
+      viewer: { userId: "u1", displayName: null, isSuperAdmin: false },
+    });
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const res = await GET(req());
+    const body = await res.json();
+    expect(body.displayName).toBeNull();
   });
 
   it("always queries entries for an authenticated user (no player-less short-circuit)", async () => {

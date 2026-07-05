@@ -4,7 +4,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import You from "@/app/(app)/you/page";
 import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
-import { loadName, saveName } from "@/lib/rememberMe";
+import { saveName } from "@/lib/rememberMe";
 import type { MeResponse, OverallRow } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
@@ -14,19 +14,19 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/rememberMe", () => ({
-  loadName: vi.fn(),
   saveName: vi.fn(),
 }));
 
 const mockedGetMe = vi.mocked(getMe);
 const mockedGetLeaderboard = vi.mocked(getLeaderboard);
-const mockedLoadName = vi.mocked(loadName);
 const mockedRenameSelf = vi.mocked(renameSelf);
 const mockedSaveName = vi.mocked(saveName);
 
 const today = "2026-07-03";
 const yesterday = "2026-07-02";
 
+// Viewer identity (the header name) now comes from the server via
+// me.displayName, never from localStorage.
 const meResponse: MeResponse = {
   today: { date: today, loggedCount: 3, totalCount: 5, games: [] },
   streaks: [
@@ -39,6 +39,7 @@ const meResponse: MeResponse = {
     { gameId: "pips", name: "Pips", variant: "Hard", value: 72, solved: true, puzzleDate: today },
     { gameId: "mini", name: "Mini", variant: null, value: 48, solved: true, puzzleDate: yesterday },
   ],
+  displayName: "You",
 };
 
 const leaderboardRows: OverallRow[] = [
@@ -50,10 +51,8 @@ const leaderboardRows: OverallRow[] = [
 beforeEach(() => {
   mockedGetMe.mockReset();
   mockedGetLeaderboard.mockReset();
-  mockedLoadName.mockReset();
   mockedRenameSelf.mockReset();
   mockedSaveName.mockReset();
-  mockedLoadName.mockReturnValue("You");
 });
 
 afterEach(() => {
@@ -85,7 +84,7 @@ describe("You", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     const { container } = render(<You />);
@@ -102,7 +101,7 @@ describe("You", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     render(<You />);
@@ -116,7 +115,7 @@ describe("You", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     const { container } = render(<You />);
@@ -139,7 +138,7 @@ describe("You", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     render(<You />);
@@ -152,7 +151,7 @@ describe("You", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: { ...meResponse, recent: [] } });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     render(<You />);
@@ -165,7 +164,7 @@ describe("You", () => {
     mockedGetMe.mockResolvedValue({ ok: false, error: "Something went wrong — try again.", status: 500 });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     render(<You />);
@@ -180,12 +179,11 @@ describe("You", () => {
     await waitFor(() => expect(screen.getAllByText("Wordle").length).toBeGreaterThan(0));
   });
 
-  it("shows an EmptyState prompting sign-in when there is no remembered name", async () => {
-    mockedLoadName.mockReturnValue(null);
-    mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
+  it("shows an EmptyState prompting sign-in when the server has no display name for the viewer", async () => {
+    mockedGetMe.mockResolvedValue({ ok: true, data: { ...meResponse, displayName: null } });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: null },
     });
 
     render(<You />);
@@ -193,12 +191,32 @@ describe("You", () => {
     await waitFor(() => expect(screen.getByText(/sign in|set a name/i)).toBeTruthy());
   });
 
+  describe("viewer identity for a brand-new user (no localStorage name)", () => {
+    // Regression guard: the header/profile name must come from the server
+    // (me.displayName) — a freshly-onboarded user has never had anything
+    // written to localStorage (only the rename flow writes it), yet the You
+    // screen must show their name immediately.
+    it("shows the header name and rank sourced from me.displayName with no localStorage dependency", async () => {
+      mockedGetMe.mockResolvedValue({ ok: true, data: { ...meResponse, displayName: "Devanshi" } });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "Devanshi" },
+      });
+
+      render(<You />);
+
+      await waitFor(() => expect(screen.getAllByText("Devanshi").length).toBeGreaterThan(0));
+      // Rank: "Devanshi" is 3rd by wins (18, 16, 14)
+      expect(screen.getByText(/#3/)).toBeTruthy();
+    });
+  });
+
   describe("Edit name", () => {
     beforeEach(() => {
       mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
       mockedGetLeaderboard.mockResolvedValue({
         ok: true,
-        data: { window: "weekly", locked: false, players: leaderboardRows },
+        data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
       });
     });
 
@@ -226,6 +244,11 @@ describe("You", () => {
       fireEvent.click(screen.getByRole("button", { name: /edit name/i }));
       const input = screen.getByRole("textbox") as HTMLInputElement;
       fireEvent.change(input, { target: { value: "  Abeer  " } });
+
+      // The reload after a successful rename reflects the server's updated
+      // displayName — this is what actually drives the header, not the
+      // localStorage cache.
+      mockedGetMe.mockResolvedValue({ ok: true, data: { ...meResponse, displayName: "Abeer" } });
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await waitFor(() => expect(mockedRenameSelf).toHaveBeenCalledWith("Abeer"));

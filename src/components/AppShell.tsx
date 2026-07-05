@@ -2,6 +2,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getGames } from "@/lib/api";
+import { saveName } from "@/lib/rememberMe";
 import { useTheme, type Theme } from "@/design/theme";
 import { MenuIcon } from "@/design/icons";
 import { SignInGate } from "./SignInGate";
@@ -22,6 +23,7 @@ export interface AppShellProps {
 
 interface OnboardingState {
   alreadyMember: boolean;
+  isSuperAdmin: boolean;
 }
 
 function activeFromPathname(pathname: string | null): string {
@@ -108,6 +110,11 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
       body: JSON.stringify({ displayName }),
     });
     if (res.ok) {
+      // Belt-and-suspenders: the rename flow is the only other writer of this
+      // cache, so a brand-new user would otherwise have no localStorage name
+      // until they explicitly renamed. Server session remains the source of
+      // truth for viewer identity; this just keeps the device-local cache warm.
+      saveName(displayName);
       await refreshOnboarding();
     }
     return res.ok;
@@ -141,6 +148,7 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
         theme={theme}
         setTheme={setTheme}
         pathname={pathname}
+        isSuperAdmin={onboarding?.isSuperAdmin ?? false}
       >
         {children}
       </ShellContent>
@@ -159,6 +167,7 @@ interface ShellContentProps {
   theme: Theme;
   setTheme: (t: Theme) => void;
   pathname: string | null;
+  isSuperAdmin: boolean;
 }
 
 // Rendered inside BoardProvider so it (and the overlays it mounts) can call useBoard().
@@ -173,6 +182,7 @@ function ShellContent({
   theme,
   setTheme,
   pathname,
+  isSuperAdmin,
 }: ShellContentProps): JSX.Element {
   const board = useBoard();
   const searchParams = useSearchParams();
@@ -212,6 +222,7 @@ function ShellContent({
         onClose={() => setDrawerOpen(false)}
         theme={theme}
         setTheme={setTheme}
+        isSuperAdmin={isSuperAdmin}
       />
 
       <CreateGroup

@@ -91,8 +91,9 @@ export async function GET(
     LIMIT 1
   `) as unknown[];
   const playedToday = playedRows.length > 0;
+  const viewerName = guard.viewer.displayName ?? null;
   if (isDailyBoardLocked(window, playedToday)) {
-    return NextResponse.json({ gameId, window, locked: true, players: [] });
+    return NextResponse.json({ gameId, window, locked: true, players: [], viewerName });
   }
 
   const names = new Map(rows.map((r) => [r.user_id, r.display_name]));
@@ -115,5 +116,5 @@ export async function GET(
     currentStreak: s.currentStreak,
     longestStreak: s.longestStreak,
   }));
-  return NextResponse.json({ gameId, window, locked: false, players });
+  return NextResponse.json({ gameId, window, locked: false, players, viewerName });
 }

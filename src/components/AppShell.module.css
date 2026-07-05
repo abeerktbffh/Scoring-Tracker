@@ -21,5 +21,7 @@
 }
 
 .content {
-  padding-bottom: 84px;
+  padding: 0 var(--space-4) 84px;
+  max-width: 640px;
+  margin: 0 auto;
 }

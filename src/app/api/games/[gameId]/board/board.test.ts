@@ -51,7 +51,13 @@ describe("GET /api/games/[gameId]/board", () => {
     const res = await GET(req(), { params: { gameId: "g_wordle" } });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ gameId: "g_wordle", window: "daily", locked: true, players: [] });
+    expect(body).toEqual({
+      gameId: "g_wordle",
+      window: "daily",
+      locked: true,
+      players: [],
+      viewerName: "Session Player",
+    });
   });
 
   it("returns the board shape for a user who has played today", async () => {
@@ -86,6 +92,7 @@ describe("GET /api/games/[gameId]/board", () => {
           longestStreak: 1,
         },
       ],
+      viewerName: "Session Player",
     });
 
     // Query joins `users` (not `players`) and has no group_id filter.
@@ -114,7 +121,13 @@ describe("GET /api/games/[gameId]/board", () => {
     const res = await GET(req(), { params: { gameId: "g_wordle" } });
     const body = await res.json();
     // Viewer (u_session) hasn't played today, so the board is locked.
-    expect(body).toEqual({ gameId: "g_wordle", window: "daily", locked: true, players: [] });
+    expect(body).toEqual({
+      gameId: "g_wordle",
+      window: "daily",
+      locked: true,
+      players: [],
+      viewerName: "Session Player",
+    });
   });
 
   it("uses requireUser and the global query when ?group= is absent", async () => {
@@ -190,7 +203,13 @@ describe("GET /api/games/[gameId]/board", () => {
       params: { gameId: "g_wordle" },
     });
     const body = await res.json();
-    expect(body).toEqual({ gameId: "g_wordle", window: "daily", locked: true, players: [] });
+    expect(body).toEqual({
+      gameId: "g_wordle",
+      window: "daily",
+      locked: true,
+      players: [],
+      viewerName: "Session Player",
+    });
   });
 
   it("unlocks a group-scoped board via the dedicated played-today query even when group-filtered rows contain none of the viewer's plays", async () => {
@@ -220,6 +239,12 @@ describe("GET /api/games/[gameId]/board", () => {
       params: { gameId: "g_wordle" },
     });
     const body = await res.json();
-    expect(body).toEqual({ gameId: "g_wordle", window: "daily", locked: true, players: [] });
+    expect(body).toEqual({
+      gameId: "g_wordle",
+      window: "daily",
+      locked: true,
+      players: [],
+      viewerName: "Session Player",
+    });
   });
 });

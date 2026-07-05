@@ -92,10 +92,10 @@ export function GroupOverflowMenu({ onManage }: GroupOverflowMenuProps): JSX.Ele
       <Menu open={open} onClose={close}>
         {panel === "menu" && (
           <>
-            {board.role === "admin" && <MenuItem onClick={handleManage}>Manage group</MenuItem>}
+            {board.role === "admin" && <MenuItem onClick={handleManage}>Manage</MenuItem>}
             <MenuItem onClick={handleInvite}>Invite</MenuItem>
             <MenuItem danger onClick={() => setPanel("leave-confirm")}>
-              Leave group
+              Leave
             </MenuItem>
           </>
         )}

@@ -39,6 +39,7 @@ const meResponse: MeResponse = {
   },
   streaks: [],
   recent: [],
+  displayName: "You",
 };
 
 beforeEach(() => {

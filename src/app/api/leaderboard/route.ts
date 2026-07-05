@@ -113,5 +113,5 @@ export async function GET(req: Request) {
     gamesPlayed: s.gamesPlayed,
     winRate: s.winRate,
   }));
-  return NextResponse.json({ window, locked, players });
+  return NextResponse.json({ window, locked, players, viewerName: guard.viewer.displayName ?? null });
 }

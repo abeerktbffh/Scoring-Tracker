@@ -4,7 +4,6 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import Standings from "@/app/(app)/standings/page";
 import { getLeaderboard, getBoard, getGames } from "@/lib/api";
-import { loadName } from "@/lib/rememberMe";
 import { useBoard } from "@/components/BoardContext";
 import type { OverallRow, GameBoardRow, Game } from "@/lib/api";
 
@@ -14,10 +13,6 @@ vi.mock("@/lib/api", () => ({
   getGames: vi.fn(),
 }));
 
-vi.mock("@/lib/rememberMe", () => ({
-  loadName: vi.fn(),
-}));
-
 vi.mock("@/components/BoardContext", () => ({
   useBoard: vi.fn(),
 }));
@@ -25,7 +20,6 @@ vi.mock("@/components/BoardContext", () => ({
 const mockedGetLeaderboard = vi.mocked(getLeaderboard);
 const mockedGetBoard = vi.mocked(getBoard);
 const mockedGetGames = vi.mocked(getGames);
-const mockedLoadName = vi.mocked(loadName);
 const mockedUseBoard = vi.mocked(useBoard);
 
 const leaderboardRows: OverallRow[] = [
@@ -59,19 +53,19 @@ beforeEach(() => {
   mockedGetLeaderboard.mockReset();
   mockedGetBoard.mockReset();
   mockedGetGames.mockReset();
-  mockedLoadName.mockReset();
-  mockedLoadName.mockReturnValue("You");
   mockedUseBoard.mockReset();
   setBoard(null);
 
+  // Viewer identity now comes from the server via `viewerName` on the
+  // leaderboard/board responses, never from localStorage.
   mockedGetLeaderboard.mockResolvedValue({
     ok: true,
-    data: { window: "weekly", locked: false, players: leaderboardRows },
+    data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
   });
   mockedGetGames.mockResolvedValue({ ok: true, data: { games } });
   mockedGetBoard.mockResolvedValue({
     ok: true,
-    data: { gameId: "wordle", window: "weekly", locked: false, players: boardRows },
+    data: { gameId: "wordle", window: "weekly", locked: false, players: boardRows, viewerName: "You" },
   });
 });
 
@@ -84,11 +78,11 @@ describe("Standings", () => {
     render(<Standings />);
 
     await waitFor(() => expect(screen.getByText("DJ")).toBeTruthy());
-    expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", undefined);
+    expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, undefined);
 
     fireEvent.click(screen.getByRole("button", { name: "Daily" }));
 
-    await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("daily", "You", undefined));
+    await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("daily", undefined, undefined));
   });
 
   it("loads a game's board when its Chip is selected", async () => {
@@ -98,13 +92,13 @@ describe("Standings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Pips" }));
 
-    await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("pips", "weekly", "You", undefined));
+    await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("pips", "weekly", undefined, undefined));
   });
 
   it("renders LockedState instead of the table when the leaderboard is locked", async () => {
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "daily", locked: true, players: [] },
+      data: { window: "daily", locked: true, players: [], viewerName: "You" },
     });
 
     const { container } = render(<Standings />);
@@ -117,13 +111,51 @@ describe("Standings", () => {
     expect(overallCard?.querySelector("table")).toBeNull();
   });
 
+  describe("viewer identity for a brand-new user (no localStorage name)", () => {
+    // Regression guard: Standings no longer reads localStorage for viewer
+    // identity at all — "me" highlighting on both the overall table and the
+    // per-game board must come from the server's `viewerName`.
+    it("highlights the viewer's row on the overall table using the server-provided viewerName", async () => {
+      // viewerName is the same session identity regardless of which endpoint
+      // returns it, so both the overall and per-game board responses agree.
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "Devanshi" },
+      });
+      mockedGetBoard.mockResolvedValue({
+        ok: true,
+        data: { gameId: "wordle", window: "weekly", locked: false, players: boardRows, viewerName: "Devanshi" },
+      });
+
+      render(<Standings />);
+
+      await waitFor(() => expect(screen.getByText("Devanshi")).toBeTruthy());
+      const myRow = screen.getByText("Devanshi").closest("tr");
+      expect(myRow?.className).toMatch(/me/i);
+    });
+
+    it("highlights the viewer's row on the per-game board using the server-provided viewerName", async () => {
+      const { container } = render(<Standings />);
+
+      await waitFor(() => expect(screen.getByText("Wordle")).toBeTruthy());
+
+      // Scoped to the per-game board's own row class (distinct from the
+      // overall LeaderboardTable's), so this specifically exercises the
+      // board response's `viewerName`, not the leaderboard's.
+      const boardRow = container.querySelector('[class*="boardRow"]');
+      expect(boardRow).toBeTruthy();
+      expect(boardRow?.textContent).toMatch(/You/);
+      expect(boardRow?.className).toMatch(/me/i);
+    });
+  });
+
   describe("board scoping", () => {
     it("calls getLeaderboard/getGames with the selected group id", async () => {
       setBoard("g1");
 
       render(<Standings />);
 
-      await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g1"));
+      await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, "g1"));
       expect(mockedGetGames).toHaveBeenCalledWith("g1");
     });
 
@@ -132,7 +164,7 @@ describe("Standings", () => {
 
       render(<Standings />);
 
-      await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("wordle", "weekly", "You", "g1"));
+      await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("wordle", "weekly", undefined, "g1"));
     });
 
     it("re-selects the first game of the new board when boardId changes", async () => {
@@ -144,19 +176,19 @@ describe("Standings", () => {
 
       const { rerender } = render(<Standings />);
 
-      await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("wordle", "weekly", "You", undefined));
+      await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("wordle", "weekly", undefined, undefined));
 
       mockedGetGames.mockResolvedValue({ ok: true, data: { games: gamesG2 } });
       mockedGetBoard.mockResolvedValue({
         ok: true,
-        data: { gameId: "connections", window: "weekly", locked: false, players: boardRows },
+        data: { gameId: "connections", window: "weekly", locked: false, players: boardRows, viewerName: "You" },
       });
       setBoard("g2");
       rerender(<Standings />);
 
       await waitFor(() => expect(mockedGetGames).toHaveBeenCalledWith("g2"));
-      await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("connections", "weekly", "You", "g2"));
-      expect(mockedGetBoard).not.toHaveBeenCalledWith("wordle", "weekly", "You", "g2");
+      await waitFor(() => expect(mockedGetBoard).toHaveBeenCalledWith("connections", "weekly", undefined, "g2"));
+      expect(mockedGetBoard).not.toHaveBeenCalledWith("wordle", "weekly", undefined, "g2");
     });
 
     it("refetches the overall leaderboard when boardId changes", async () => {
@@ -164,12 +196,12 @@ describe("Standings", () => {
 
       const { rerender } = render(<Standings />);
 
-      await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", undefined));
+      await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, undefined));
 
       setBoard("g2");
       rerender(<Standings />);
 
-      await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g2"));
+      await waitFor(() => expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, "g2"));
     });
 
     it("does not keep showing the previous board's game table while the new board's own board is still loading", async () => {
@@ -179,7 +211,7 @@ describe("Standings", () => {
       ];
       mockedGetBoard.mockResolvedValue({
         ok: true,
-        data: { gameId: "wordle", window: "weekly", locked: false, players: staleRows },
+        data: { gameId: "wordle", window: "weekly", locked: false, players: staleRows, viewerName: "You" },
       });
 
       const { rerender } = render(<Standings />);
@@ -214,7 +246,7 @@ describe("Standings", () => {
 
       resolveBoard({
         ok: true,
-        data: { gameId: "connections", window: "weekly", locked: false, players: [] },
+        data: { gameId: "connections", window: "weekly", locked: false, players: [], viewerName: "You" },
       });
     });
 
@@ -225,7 +257,7 @@ describe("Standings", () => {
       ];
       mockedGetBoard.mockResolvedValue({
         ok: true,
-        data: { gameId: "wordle", window: "weekly", locked: false, players: staleRows },
+        data: { gameId: "wordle", window: "weekly", locked: false, players: staleRows, viewerName: "You" },
       });
 
       const { rerender } = render(<Standings />);

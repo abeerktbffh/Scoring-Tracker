@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMe, getLeaderboard } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
-import { loadName } from "@/lib/rememberMe";
 import { useBoard } from "@/components/BoardContext";
 import { sortPlayers } from "@/lib/leaderboardSort";
 import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
@@ -30,38 +29,34 @@ function bestCurrentStreak(me: MeResponse): number {
 export default function Home(): JSX.Element {
   const router = useRouter();
   const { boardId } = useBoard();
-  const [name, setName] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
 
-  const load = useCallback(
-    (displayName: string | null) => {
-      setState({ status: "loading" });
-      Promise.all([
-        getMe(displayName ?? "", boardId ?? undefined),
-        getLeaderboard("weekly", displayName ?? undefined, boardId ?? undefined),
-      ]).then(([meResult, leaderboardResult]) => {
-        if (!meResult.ok) {
-          setState({ status: "error", message: meResult.error });
-          return;
-        }
-        if (!leaderboardResult.ok) {
-          setState({ status: "error", message: leaderboardResult.error });
-          return;
-        }
-        setState({ status: "ready", me: meResult.data, rows: leaderboardResult.data.players });
-      });
-    },
-    [boardId]
-  );
+  const load = useCallback(() => {
+    setState({ status: "loading" });
+    Promise.all([
+      // The `player` arg is a legacy param the server ignores — viewer identity
+      // is resolved from the session, not this client-supplied value.
+      getMe("", boardId ?? undefined),
+      getLeaderboard("weekly", undefined, boardId ?? undefined),
+    ]).then(([meResult, leaderboardResult]) => {
+      if (!meResult.ok) {
+        setState({ status: "error", message: meResult.error });
+        return;
+      }
+      if (!leaderboardResult.ok) {
+        setState({ status: "error", message: leaderboardResult.error });
+        return;
+      }
+      setState({ status: "ready", me: meResult.data, rows: leaderboardResult.data.players });
+    });
+  }, [boardId]);
 
   useEffect(() => {
-    const displayName = loadName();
-    setName(displayName);
-    load(displayName);
+    load();
   }, [load]);
 
-  const handleRetry = useCallback(() => load(name), [load, name]);
+  const handleRetry = useCallback(() => load(), [load]);
   const goToLog = useCallback(() => router.push("/log"), [router]);
 
   return (
@@ -89,7 +84,14 @@ export default function Home(): JSX.Element {
       {state.status === "error" && <ErrorState message={state.message} onRetry={handleRetry} />}
 
       {state.status === "ready" && (
-        <HomeReady me={state.me} rows={state.rows} name={name} sortKey={sortKey} onSort={setSortKey} onLog={goToLog} />
+        <HomeReady
+          me={state.me}
+          rows={state.rows}
+          sortKey={sortKey}
+          onSort={setSortKey}
+          onLog={goToLog}
+          isGroup={boardId !== null}
+        />
       )}
     </div>
   );
@@ -98,16 +100,24 @@ export default function Home(): JSX.Element {
 interface HomeReadyProps {
   me: MeResponse;
   rows: OverallRow[];
-  name: string | null;
   sortKey: LeaderboardSortKey;
   onSort: (key: LeaderboardSortKey) => void;
   onLog: () => void;
+  isGroup: boolean;
 }
 
-function HomeReady({ me, rows, name, sortKey, onSort, onLog }: HomeReadyProps): JSX.Element {
-  const isEmpty = !name || (me.today.totalCount === 0 && rows.length === 0);
-
-  if (isEmpty) {
+function HomeReady({ me, rows, sortKey, onSort, onLog, isGroup }: HomeReadyProps): JSX.Element {
+  // totalCount reflects how many games the board tracks (group-tracked-active
+  // games for a group; the catalog for the global board) — not whether the
+  // viewer has logged anything. Only an empty catalog/tracking list is a true
+  // "empty" state; a member who simply hasn't logged today still sees the
+  // Today card + board.
+  if (me.today.totalCount === 0) {
+    if (isGroup) {
+      return (
+        <EmptyState title="No games tracked" body="This group isn't tracking any games yet." />
+      );
+    }
     return (
       <EmptyState
         title="Nothing logged yet"
@@ -118,6 +128,10 @@ function HomeReady({ me, rows, name, sortKey, onSort, onLog }: HomeReadyProps): 
   }
 
   const streak = bestCurrentStreak(me);
+  // Viewer identity comes from the server session (me.displayName), never
+  // localStorage — a brand-new user has no localStorage name but is still
+  // identified as "me" as soon as the server knows their display name.
+  const name = me.displayName;
   // Show the top N, and if the viewer is outside the top N, show their row below
   // a gap with their TRUE rank so they can always see where they stand.
   const sorted = sortPlayers(rows, sortKey);

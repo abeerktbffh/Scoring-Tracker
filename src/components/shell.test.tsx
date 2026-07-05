@@ -228,12 +228,28 @@ describe("Drawer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("has an Admin link and no leftover Group stub", () => {
-    render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
+  it("shows an Admin link (no leftover Group stub) when the viewer is a super admin", () => {
+    render(
+      <Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} isSuperAdmin={true} />
+    );
 
     const adminLink = screen.getByText(/admin/i).closest("a");
     expect(adminLink?.getAttribute("href")).toBe("/admin");
     expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+
+  it("hides the Admin link when the viewer is not a super admin", () => {
+    render(
+      <Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} isSuperAdmin={false} />
+    );
+
+    expect(screen.queryByText(/^admin$/i)).toBeNull();
+  });
+
+  it("hides the Admin link when isSuperAdmin is omitted", () => {
+    render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
+
+    expect(screen.queryByText(/^admin$/i)).toBeNull();
   });
 });
 
@@ -445,9 +461,47 @@ describe("AppShell", () => {
 
     // Open the overflow menu and choose Manage.
     fireEvent.click(screen.getByRole("button", { name: /group options/i }));
-    fireEvent.click(screen.getByText(/manage group/i));
+    fireEvent.click(screen.getByText(/^manage$/i));
 
     await waitFor(() => expect(screen.getByTestId("manage-group-backdrop")).toBeTruthy());
     expect(mockedGetGroupMembers).toHaveBeenCalledWith("g1");
+  });
+
+  it("shows the Admin link in the drawer for a super admin", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+      isSuperAdmin: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
+
+    expect(screen.getByText(/^admin$/i)).toBeTruthy();
+  });
+
+  it("hides the Admin link in the drawer for a non-super-admin", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+      isSuperAdmin: false,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
+
+    expect(screen.queryByText(/^admin$/i)).toBeNull();
   });
 });
