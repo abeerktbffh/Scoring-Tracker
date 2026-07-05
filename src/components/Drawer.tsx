@@ -30,10 +30,6 @@ export function Drawer({ open, onClose, theme, setTheme }: DrawerProps): JSX.Ele
         aria-hidden={!open}
       >
         <div className={styles.section}>
-          <button type="button" className={styles.item} disabled>
-            Group
-            <span className={styles.badge}>Coming soon</span>
-          </button>
           <Link href="/admin" className={styles.item} onClick={onClose}>
             Admin
           </Link>

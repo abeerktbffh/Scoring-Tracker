@@ -71,15 +71,6 @@
   cursor: not-allowed;
 }
 
-.badge {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .themeToggle {
   font-size: 18px;
 }

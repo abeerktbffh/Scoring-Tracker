@@ -228,15 +228,12 @@ describe("Drawer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("has a disabled 'coming soon' Group item and an Admin link", () => {
+  it("has an Admin link and no leftover Group stub", () => {
     render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
-
-    const groupItem = screen.getByText(/group/i).closest("button, [disabled]");
-    expect(screen.getByText(/coming soon/i)).toBeTruthy();
 
     const adminLink = screen.getByText(/admin/i).closest("a");
     expect(adminLink?.getAttribute("href")).toBe("/admin");
-    expect(groupItem).toBeTruthy();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
 
