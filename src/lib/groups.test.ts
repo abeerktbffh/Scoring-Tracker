@@ -2,8 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const sqlMock = vi.fn();
 vi.mock("@/db/client", () => ({ sql: sqlMock }));
 vi.mock("@/lib/ids", () => ({ newId: (p: string) => `${p}_test` }));
-vi.mock("@/lib/inviteToken", () => ({ generateInviteToken: () => ({ token: "tok", tokenHash: "hash" }) }));
-const { createGroup, listMyGroups } = await import("./groups");
+vi.mock("@/lib/inviteToken", () => ({
+  generateInviteToken: () => ({ token: "tok", tokenHash: "hash" }),
+  hashInviteToken: (t: string) => `h(${t})`,
+}));
+const { createGroup, listMyGroups, joinViaToken, groupPreviewByToken } = await import("./groups");
 beforeEach(() => { vi.clearAllMocks(); sqlMock.mockResolvedValue([]); });
 
 describe("createGroup", () => {
@@ -32,5 +35,43 @@ describe("listMyGroups", () => {
   it("maps rows to {id,name,role}", async () => {
     sqlMock.mockResolvedValueOnce([{ id: "g1", name: "Fam", role: "admin" }]);
     expect(await listMyGroups("u1")).toEqual([{ id: "g1", name: "Fam", role: "admin" }]);
+  });
+});
+
+describe("joinViaToken", () => {
+  it("invalid token → invalid-token", async () => {
+    sqlMock.mockResolvedValueOnce([]); // group lookup by hash: none
+    expect(await joinViaToken("u1", "bad")).toEqual({ ok: false, reason: "invalid-token" });
+  });
+  it("valid token inserts a member membership", async () => {
+    sqlMock.mockResolvedValueOnce([{ id: "g1" }]); // group found
+    sqlMock.mockResolvedValueOnce([]); // insert membership
+    expect(await joinViaToken("u1", "good")).toEqual({ ok: true, groupId: "g1" });
+  });
+  it("already-member (23505) is treated as success", async () => {
+    sqlMock.mockResolvedValueOnce([{ id: "g1" }]);
+    sqlMock.mockRejectedValueOnce({ code: "23505", constraint: "memberships_group_user_uq" });
+    expect(await joinViaToken("u1", "good")).toEqual({ ok: true, groupId: "g1" });
+  });
+  it("rethrows unrelated errors", async () => {
+    sqlMock.mockResolvedValueOnce([{ id: "g1" }]);
+    sqlMock.mockRejectedValueOnce({ code: "23505", constraint: "some_other_constraint" });
+    await expect(joinViaToken("u1", "good")).rejects.toBeTruthy();
+  });
+});
+
+describe("groupPreviewByToken", () => {
+  it("returns null when token doesn't match a group", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    expect(await groupPreviewByToken("bad")).toBeNull();
+  });
+  it("maps row to preview shape", async () => {
+    sqlMock.mockResolvedValueOnce([{ id: "g1", name: "Fam", member_count: 3, game_count: 2 }]);
+    expect(await groupPreviewByToken("good")).toEqual({
+      id: "g1",
+      name: "Fam",
+      memberCount: 3,
+      gameCount: 2,
+    });
   });
 });

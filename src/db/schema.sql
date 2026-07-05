@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS memberships (
   user_id    TEXT NOT NULL REFERENCES users(id),
   role       TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member')),
   joined_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (group_id, user_id)
+  CONSTRAINT memberships_group_user_uq UNIQUE (group_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS memberships_user_idx ON memberships (user_id);
 
