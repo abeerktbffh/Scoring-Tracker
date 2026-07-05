@@ -66,3 +66,27 @@ export async function groupPreviewByToken(
   const r = rows[0];
   return r ? { id: r.id, name: r.name, memberCount: Number(r.member_count), gameCount: Number(r.game_count) } : null;
 }
+
+async function reconcileAfterRemoval(groupId: string): Promise<void> {
+  // Promote the oldest remaining member to admin, but only if no admin remains.
+  await sql`
+    UPDATE memberships SET role = 'admin'
+    WHERE group_id = ${groupId} AND role = 'member'
+      AND NOT EXISTS (SELECT 1 FROM memberships WHERE group_id = ${groupId} AND role = 'admin')
+      AND id = (SELECT id FROM memberships WHERE group_id = ${groupId} AND role = 'member' ORDER BY joined_at, id LIMIT 1)
+  `;
+  // Delete the group if it now has no members at all.
+  await sql`DELETE FROM groups WHERE id = ${groupId} AND NOT EXISTS (SELECT 1 FROM memberships WHERE group_id = ${groupId})`;
+}
+
+export async function leaveGroup(userId: string, groupId: string): Promise<{ ok: true }> {
+  await sql`DELETE FROM memberships WHERE group_id = ${groupId} AND user_id = ${userId}`;
+  await reconcileAfterRemoval(groupId);
+  return { ok: true };
+}
+
+export async function removeMember(groupId: string, targetUserId: string): Promise<{ ok: true }> {
+  await sql`DELETE FROM memberships WHERE group_id = ${groupId} AND user_id = ${targetUserId}`;
+  await reconcileAfterRemoval(groupId);
+  return { ok: true };
+}

@@ -6,7 +6,8 @@ vi.mock("@/lib/inviteToken", () => ({
   generateInviteToken: () => ({ token: "tok", tokenHash: "hash" }),
   hashInviteToken: (t: string) => `h(${t})`,
 }));
-const { createGroup, listMyGroups, joinViaToken, groupPreviewByToken } = await import("./groups");
+const { createGroup, listMyGroups, joinViaToken, groupPreviewByToken, leaveGroup, removeMember } =
+  await import("./groups");
 beforeEach(() => { vi.clearAllMocks(); sqlMock.mockResolvedValue([]); });
 
 describe("createGroup", () => {
@@ -73,5 +74,28 @@ describe("groupPreviewByToken", () => {
       memberCount: 3,
       gameCount: 2,
     });
+  });
+});
+
+describe("leaveGroup", () => {
+  it("runs delete-self, then conditional promote, then conditional group-delete", async () => {
+    sqlMock.mockResolvedValue([]);
+    await leaveGroup("u1", "g1");
+    const texts = sqlMock.mock.calls.map((c) => String(c[0].join("?")));
+    expect(texts[0]).toContain("DELETE FROM memberships");
+    expect(texts[1]).toContain("UPDATE memberships SET role = 'admin'");
+    expect(texts[1]).toContain("NOT EXISTS");
+    expect(texts[2]).toContain("DELETE FROM groups");
+    expect(texts[2]).toContain("NOT EXISTS");
+  });
+});
+describe("removeMember", () => {
+  it("deletes the target then reconciles admin/empty", async () => {
+    sqlMock.mockResolvedValue([]);
+    await removeMember("g1", "u2");
+    const texts = sqlMock.mock.calls.map((c) => String(c[0].join("?")));
+    expect(texts[0]).toContain("DELETE FROM memberships");
+    expect(texts.some((t) => t.includes("UPDATE memberships SET role = 'admin'"))).toBe(true);
+    expect(texts.some((t) => t.includes("DELETE FROM groups"))).toBe(true);
   });
 });
