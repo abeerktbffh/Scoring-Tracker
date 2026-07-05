@@ -9,6 +9,7 @@ import { Onboarding } from "./Onboarding";
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { BoardProvider } from "./BoardContext";
+import { BoardSwitcher } from "./BoardSwitcher";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -50,6 +51,7 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
 
@@ -134,6 +136,8 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
           >
             <MenuIcon size={22} />
           </button>
+
+          <BoardSwitcher onNewGroup={() => setCreateOpen(true)} />
         </header>
 
         <main className={styles.content}>{children}</main>
@@ -146,6 +150,9 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
           theme={theme}
           setTheme={setTheme}
         />
+
+        {/* CreateGroup overlay: Task 6 */}
+        {createOpen && null}
       </div>
     </BoardProvider>
   );

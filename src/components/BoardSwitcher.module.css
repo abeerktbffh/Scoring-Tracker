@@ -1,0 +1,34 @@
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  color: var(--ink);
+  cursor: pointer;
+  padding: var(--space-2);
+  margin: 0 auto;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.chevron {
+  color: var(--muted);
+  flex: none;
+}
+
+.divider {
+  height: 1px;
+  background: var(--line);
+  margin: var(--space-2) 0;
+}
+
+.newGroup {
+  color: var(--accent);
+  font-weight: 700;
+}

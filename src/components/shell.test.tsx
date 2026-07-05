@@ -207,6 +207,8 @@ describe("AppShell", () => {
     await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
     expect(screen.getByRole("button", { name: /menu/i })).toBeTruthy();
     expect(screen.getAllByRole("link").length).toBeGreaterThan(0);
+    expect(mockedListMyGroups).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /global/i })).toBeTruthy();
   });
 
   it("shows the name-entry onboarding screen for a new user, without rendering the app", async () => {
