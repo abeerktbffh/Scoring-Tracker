@@ -15,7 +15,7 @@ export async function createGroup(
 
   const groupId = newId("grp");
   const { token, tokenHash } = generateInviteToken();
-  await sql`INSERT INTO groups (id, name, created_by, invite_token_hash) VALUES (${groupId}, ${trimmed}, ${userId}, ${tokenHash})`;
+  await sql`INSERT INTO groups (id, name, created_by, invite_token_hash, invite_token) VALUES (${groupId}, ${trimmed}, ${userId}, ${tokenHash}, ${token})`;
   await sql`INSERT INTO memberships (id, group_id, user_id, role) VALUES (${newId("mem")}, ${groupId}, ${userId}, 'admin')`;
   // Only track games that exist in the active catalog; ignore unknown ids.
   for (const gameId of gameIds) {
@@ -111,6 +111,12 @@ export async function setGroupGames(groupId: string, gameIds: string[]): Promise
 
 export async function resetInvite(groupId: string): Promise<{ token: string }> {
   const { token, tokenHash } = generateInviteToken();
-  await sql`UPDATE groups SET invite_token_hash = ${tokenHash} WHERE id = ${groupId}`;
+  await sql`UPDATE groups SET invite_token_hash = ${tokenHash}, invite_token = ${token} WHERE id = ${groupId}`;
   return { token };
+}
+
+export async function getGroupInvite(groupId: string): Promise<{ token: string } | null> {
+  const rows = (await sql`SELECT invite_token FROM groups WHERE id = ${groupId}`) as { invite_token: string | null }[];
+  const token = rows[0]?.invite_token;
+  return token ? { token } : null;
 }

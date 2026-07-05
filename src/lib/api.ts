@@ -242,3 +242,7 @@ export function leaveGroup(groupId: string): Promise<ApiResult<{ ok: true }>> {
 export function resetGroupInvite(groupId: string): Promise<ApiResult<{ link: string }>> {
   return request(`/api/groups/${encodeURIComponent(groupId)}/invite`, jsonPost({}));
 }
+
+export function getGroupInvite(groupId: string): Promise<ApiResult<{ link: string }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/invite`);
+}

@@ -16,6 +16,7 @@ const {
   renameGroup,
   setGroupGames,
   resetInvite,
+  getGroupInvite,
 } = await import("./groups");
 beforeEach(() => { vi.clearAllMocks(); sqlMock.mockResolvedValue([]); });
 
@@ -38,6 +39,15 @@ describe("createGroup", () => {
     expect(sqlText).toContain("INSERT INTO group_games");
     // trimmed name bound
     expect(sqlMock.mock.calls.flatMap((c) => c.slice(1))).toContain("Family");
+  });
+  it("binds both the token hash and the plaintext token on the INSERT", async () => {
+    await createGroup("u1", "Family", []);
+    const insertCall = sqlMock.mock.calls.find((c) => String(c[0].join("?")).includes("INSERT INTO groups"));
+    const sqlText = insertCall![0].join("?");
+    expect(sqlText).toContain("invite_token_hash");
+    expect(sqlText).toMatch(/invite_token\)/); // column list includes plain invite_token, not just the _hash one
+    expect(insertCall!.slice(1)).toContain("hash");
+    expect(insertCall!.slice(1)).toContain("tok");
   });
 });
 
@@ -133,5 +143,29 @@ describe("resetInvite", () => {
   it("returns a token and updates the hash", async () => {
     sqlMock.mockResolvedValueOnce([]);
     expect(await resetInvite("g1")).toEqual({ token: "tok" }); // per generateInviteToken mock
+  });
+  it("also binds the plaintext token in the same UPDATE", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    await resetInvite("g1");
+    const sqlText = sqlMock.mock.calls[0][0].join("?");
+    expect(sqlText).toContain("invite_token_hash = ?");
+    expect(sqlText).toContain("invite_token = ?");
+    expect(sqlMock.mock.calls[0].slice(1)).toContain("hash");
+    expect(sqlMock.mock.calls[0].slice(1)).toContain("tok");
+  });
+});
+
+describe("getGroupInvite", () => {
+  it("returns null when the group has no token", async () => {
+    sqlMock.mockResolvedValueOnce([{ invite_token: null }]);
+    expect(await getGroupInvite("g1")).toBeNull();
+  });
+  it("returns null when the group doesn't exist", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    expect(await getGroupInvite("missing")).toBeNull();
+  });
+  it("returns the token when present", async () => {
+    sqlMock.mockResolvedValueOnce([{ invite_token: "tok_current" }]);
+    expect(await getGroupInvite("g1")).toEqual({ token: "tok_current" });
   });
 });

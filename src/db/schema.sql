@@ -177,6 +177,10 @@ CREATE TABLE IF NOT EXISTS group_games (
 ALTER TABLE groups ADD COLUMN IF NOT EXISTS invite_token_hash TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS groups_invite_token_hash_uq ON groups (invite_token_hash) WHERE invite_token_hash IS NOT NULL;
 
+-- Phase 2a addendum: plaintext invite token stored so any member can re-display the current link
+-- (low-sensitivity join link, owner-approved) without needing to rotate it via reset
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS invite_token TEXT;
+
 -- Phase 2 cutover prerequisite: relax legacy NOT NULLs so INSERT INTO groups (id, name, created_by, invite_token_hash) is valid regardless of deploy ordering
 ALTER TABLE groups ALTER COLUMN passphrase_hash DROP NOT NULL;
 ALTER TABLE groups ALTER COLUMN timezone DROP NOT NULL;
