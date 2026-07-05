@@ -1,0 +1,86 @@
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--ink);
+  cursor: pointer;
+  padding: var(--space-2);
+  margin-left: auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hint {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.error {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--danger);
+  margin: 0;
+}
+
+.link {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--tile-empty);
+  border-radius: var(--r-tile);
+  padding: var(--space-2);
+  word-break: break-all;
+  margin: 0;
+}
+
+.actionButton {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.backButton {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: var(--space-1) 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.confirmRow {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.dangerButton {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--danger);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.dangerButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

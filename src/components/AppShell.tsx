@@ -10,6 +10,7 @@ import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { BoardProvider } from "./BoardContext";
 import { BoardSwitcher } from "./BoardSwitcher";
+import { GroupOverflowMenu } from "./GroupOverflowMenu";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -52,6 +53,7 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
 
@@ -138,6 +140,8 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
           </button>
 
           <BoardSwitcher onNewGroup={() => setCreateOpen(true)} />
+
+          <GroupOverflowMenu onManage={() => setManageOpen(true)} />
         </header>
 
         <main className={styles.content}>{children}</main>
@@ -153,6 +157,8 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
 
         {/* CreateGroup overlay: Task 6 */}
         {createOpen && null}
+        {/* ManageGroup overlay: Task 9 */}
+        {manageOpen && null}
       </div>
     </BoardProvider>
   );
