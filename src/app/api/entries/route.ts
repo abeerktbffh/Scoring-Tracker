@@ -6,18 +6,9 @@ import { newId } from "@/lib/ids";
 import { localDateInTz } from "@/lib/day";
 import { PLATFORM_TZ } from "@/lib/group";
 import { resolveSubmission, type ResolvedSubmission } from "@/lib/submission";
+import { isUniqueViolation } from "@/lib/dbError";
 
 export const runtime = "nodejs";
-
-interface NeonDbErrorLike {
-  code?: string;
-  constraint?: string;
-}
-
-function isUniqueViolation(err: unknown, constraint: string): boolean {
-  const e = err as NeonDbErrorLike | undefined;
-  return !!e && e.code === "23505" && e.constraint === constraint;
-}
 
 /**
  * Supersedes any prior active entry for this user/game/variant/day, then

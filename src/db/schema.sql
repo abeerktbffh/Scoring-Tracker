@@ -156,3 +156,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS entries_active_uq
 ALTER TABLE entries ALTER COLUMN group_id DROP NOT NULL;
 ALTER TABLE entries ALTER COLUMN player_id DROP NOT NULL;
 ALTER TABLE games ALTER COLUMN group_id DROP NOT NULL;
+
+-- === Multi-group Phase 2: memberships, per-group game selection, invite token ===
+CREATE TABLE IF NOT EXISTS memberships (
+  id         TEXT PRIMARY KEY,
+  group_id   TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  role       TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member')),
+  joined_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (group_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS memberships_user_idx ON memberships (user_id);
+
+CREATE TABLE IF NOT EXISTS group_games (
+  group_id  TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  game_id   TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  PRIMARY KEY (group_id, game_id)
+);
+
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS invite_token_hash TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS groups_invite_token_hash_uq ON groups (invite_token_hash) WHERE invite_token_hash IS NOT NULL;
+
+-- Phase 2 cutover prerequisite: relax legacy NOT NULLs so INSERT INTO groups (id, name, created_by, invite_token_hash) is valid regardless of deploy ordering
+ALTER TABLE groups ALTER COLUMN passphrase_hash DROP NOT NULL;
+ALTER TABLE groups ALTER COLUMN timezone DROP NOT NULL;

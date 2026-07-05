@@ -1,10 +1,5 @@
 import { sql } from "@/db/client";
-
-interface NeonDbErrorLike { code?: string; constraint?: string }
-function isUniqueViolation(err: unknown, constraint: string): boolean {
-  const e = err as NeonDbErrorLike | undefined;
-  return !!e && e.code === "23505" && e.constraint === constraint;
-}
+import { isUniqueViolation } from "@/lib/dbError";
 
 /** True iff another user already holds this name (case-insensitive). */
 export async function nameClashExists(name: string, excludeUserId?: string): Promise<boolean> {
