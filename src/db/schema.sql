@@ -143,7 +143,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAU
 ALTER TABLE entries ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id);
 ALTER TABLE groups ADD COLUMN IF NOT EXISTS created_by TEXT REFERENCES users(id);
 
--- One active entry per user/game/day/variant (DB-enforced; replaces the plain entries_active_idx for dedup)
+-- One active entry per user/game/day/variant (DB-enforced, replaces the plain entries_active_idx for dedup)
 -- COALESCE(variant, '') collapses NULL-variant games to a single indexable value: Postgres
 -- treats each NULL as distinct in a unique index, so without this, two concurrent inserts for
 -- the same user/game/day with variant IS NULL would both succeed. No game uses '' as an actual
