@@ -5,7 +5,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { AppShell } from "./AppShell";
-import { getGames } from "@/lib/api";
+import { getGames, listMyGroups } from "@/lib/api";
 import { signOut } from "next-auth/react";
 
 const mockSearchParams = new URLSearchParams();
@@ -17,6 +17,12 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/api", () => ({
   getGames: vi.fn(),
+  listMyGroups: vi.fn(),
+}));
+
+vi.mock("@/lib/currentBoard", () => ({
+  loadBoardId: vi.fn(() => null),
+  saveBoardId: vi.fn(),
 }));
 
 vi.mock("next-auth/react", () => ({
@@ -25,6 +31,7 @@ vi.mock("next-auth/react", () => ({
 }));
 
 const mockedGetGames = vi.mocked(getGames);
+const mockedListMyGroups = vi.mocked(listMyGroups);
 const mockedSignOut = vi.mocked(signOut);
 
 function findPostCall(
@@ -80,6 +87,9 @@ beforeEach(() => {
     ok: true,
     json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
   }) as unknown as typeof fetch;
+
+  // BoardProvider (mounted for the authed shell subtree) fetches groups on mount.
+  mockedListMyGroups.mockResolvedValue({ ok: true, data: { groups: [] } });
 });
 
 afterEach(() => {

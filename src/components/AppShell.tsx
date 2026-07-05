@@ -8,6 +8,7 @@ import { SignInGate } from "./SignInGate";
 import { Onboarding } from "./Onboarding";
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
+import { BoardProvider } from "./BoardContext";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -122,28 +123,30 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   }
 
   return (
-    <div>
-      <header className={styles.topBar}>
-        <button
-          type="button"
-          className={styles.menuButton}
-          aria-label="Open menu"
-          onClick={() => setDrawerOpen(true)}
-        >
-          <MenuIcon size={22} />
-        </button>
-      </header>
+    <BoardProvider>
+      <div>
+        <header className={styles.topBar}>
+          <button
+            type="button"
+            className={styles.menuButton}
+            aria-label="Open menu"
+            onClick={() => setDrawerOpen(true)}
+          >
+            <MenuIcon size={22} />
+          </button>
+        </header>
 
-      <main className={styles.content}>{children}</main>
+        <main className={styles.content}>{children}</main>
 
-      <TabBar active={activeFromPathname(pathname)} />
+        <TabBar active={activeFromPathname(pathname)} />
 
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        theme={theme}
-        setTheme={setTheme}
-      />
-    </div>
+        <Drawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          theme={theme}
+          setTheme={setTheme}
+        />
+      </div>
+    </BoardProvider>
   );
 }
