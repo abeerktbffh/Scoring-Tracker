@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { getMe, getLeaderboard } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
 import { loadName } from "@/lib/rememberMe";
+import { useBoard } from "@/components/BoardContext";
 import { sortPlayers } from "@/lib/leaderboardSort";
 import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
 import { Card } from "@/components/Card";
@@ -28,14 +29,18 @@ function bestCurrentStreak(me: MeResponse): number {
 
 export default function Home(): JSX.Element {
   const router = useRouter();
+  const { boardId } = useBoard();
   const [name, setName] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
 
-  const load = useCallback((displayName: string | null) => {
-    setState({ status: "loading" });
-    Promise.all([getMe(displayName ?? ""), getLeaderboard("weekly", displayName ?? undefined)]).then(
-      ([meResult, leaderboardResult]) => {
+  const load = useCallback(
+    (displayName: string | null) => {
+      setState({ status: "loading" });
+      Promise.all([
+        getMe(displayName ?? "", boardId ?? undefined),
+        getLeaderboard("weekly", displayName ?? undefined, boardId ?? undefined),
+      ]).then(([meResult, leaderboardResult]) => {
         if (!meResult.ok) {
           setState({ status: "error", message: meResult.error });
           return;
@@ -45,9 +50,10 @@ export default function Home(): JSX.Element {
           return;
         }
         setState({ status: "ready", me: meResult.data, rows: leaderboardResult.data.players });
-      }
-    );
-  }, []);
+      });
+    },
+    [boardId]
+  );
 
   useEffect(() => {
     const displayName = loadName();
