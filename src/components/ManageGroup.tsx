@@ -195,7 +195,7 @@ export function ManageGroup({ groupId, onClose, onChanged, onDeleted }: ManageGr
         aria-hidden="true"
       />
       <div className={styles.panel} role="dialog" aria-modal="true">
-        <p className={styles.title}>Manage group</p>
+        <p className={styles.title}>Manage</p>
 
         <form onSubmit={handleRename} className={styles.section}>
           <label className={styles.label} htmlFor="manage-group-name">
