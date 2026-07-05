@@ -5,7 +5,15 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { AppShell } from "./AppShell";
-import { getGames, listMyGroups, createGroup, getGroupInvite, leaveGroup } from "@/lib/api";
+import {
+  getGames,
+  listMyGroups,
+  createGroup,
+  getGroupInvite,
+  leaveGroup,
+  getGroupPreview,
+  joinGroup,
+} from "@/lib/api";
 import { signOut } from "next-auth/react";
 
 const mockSearchParams = new URLSearchParams();
@@ -26,6 +34,8 @@ vi.mock("@/lib/api", () => ({
   createGroup: vi.fn(),
   getGroupInvite: vi.fn(),
   leaveGroup: vi.fn(),
+  getGroupPreview: vi.fn(),
+  joinGroup: vi.fn(),
 }));
 
 vi.mock("@/lib/currentBoard", () => ({
@@ -43,6 +53,8 @@ const mockedListMyGroups = vi.mocked(listMyGroups);
 const mockedCreateGroup = vi.mocked(createGroup);
 const mockedGetGroupInvite = vi.mocked(getGroupInvite);
 const mockedLeaveGroup = vi.mocked(leaveGroup);
+const mockedGetGroupPreview = vi.mocked(getGroupPreview);
+const mockedJoinGroup = vi.mocked(joinGroup);
 const mockedSignOut = vi.mocked(signOut);
 
 function findPostCall(
@@ -114,6 +126,14 @@ beforeEach(() => {
     data: { link: "https://example.com/invite/existing-group" },
   });
   mockedLeaveGroup.mockResolvedValue({ ok: true, data: { ok: true } });
+
+  // JoinGroup (mounted only when a ?join= token is present) defaults to a benign
+  // preview/join pair so tests that don't exercise the join flow are unaffected.
+  mockedGetGroupPreview.mockResolvedValue({
+    ok: true,
+    data: { group: { id: "joined-group-id", name: "Family Night", memberCount: 4, gameCount: 3 } },
+  });
+  mockedJoinGroup.mockResolvedValue({ ok: true, data: { ok: true, groupId: "joined-group-id" } });
 });
 
 afterEach(() => {
@@ -302,5 +322,49 @@ describe("AppShell", () => {
 
     await waitFor(() => expect(screen.getByLabelText(/group name/i)).toBeTruthy());
     expect(screen.getByRole("button", { name: /^create$/i })).toBeTruthy();
+  });
+
+  it("does not render the JoinGroup overlay when no ?join= token is present", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+    expect(mockedGetGroupPreview).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("renders the JoinGroup overlay when the URL has a ?join= token, and joining selects the group", async () => {
+    mockSearchParams.set("join", "tok-abc");
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+    const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(mockedGetGroupPreview).toHaveBeenCalledWith("tok-abc"));
+    expect(await screen.findByText(/join family night\?/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
+
+    await waitFor(() => expect(mockedJoinGroup).toHaveBeenCalledWith("tok-abc"));
+    await waitFor(() => expect(mockedListMyGroups).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(replaceStateSpy).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/join family night\?/i)).toBeNull());
+
+    replaceStateSpy.mockRestore();
   });
 });

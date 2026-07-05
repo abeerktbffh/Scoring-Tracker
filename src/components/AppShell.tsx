@@ -1,6 +1,6 @@
 "use client";
 import React, { Suspense, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { getGames } from "@/lib/api";
 import { useTheme, type Theme } from "@/design/theme";
 import { MenuIcon } from "@/design/icons";
@@ -12,6 +12,7 @@ import { BoardProvider, useBoard } from "./BoardContext";
 import { BoardSwitcher } from "./BoardSwitcher";
 import { GroupOverflowMenu } from "./GroupOverflowMenu";
 import { CreateGroup } from "./CreateGroup";
+import { JoinGroup } from "./JoinGroup";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -173,6 +174,16 @@ function ShellContent({
   pathname,
 }: ShellContentProps): JSX.Element {
   const board = useBoard();
+  const searchParams = useSearchParams();
+  const joinToken = searchParams?.get("join") ?? null;
+  const [joinDismissed, setJoinDismissed] = useState(false);
+
+  function clearJoinParam(): void {
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    setJoinDismissed(true);
+  }
 
   return (
     <div>
@@ -214,6 +225,17 @@ function ShellContent({
 
       {/* ManageGroup overlay: Task 9 */}
       {manageOpen && null}
+
+      {joinToken && !joinDismissed && (
+        <JoinGroup
+          token={joinToken}
+          onClose={clearJoinParam}
+          onJoined={(groupId) => {
+            board.refresh().then(() => board.select(groupId));
+            clearJoinParam();
+          }}
+        />
+      )}
     </div>
   );
 }
