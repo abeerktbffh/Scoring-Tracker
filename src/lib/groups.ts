@@ -90,3 +90,27 @@ export async function removeMember(groupId: string, targetUserId: string): Promi
   await reconcileAfterRemoval(groupId);
   return { ok: true };
 }
+
+export async function renameGroup(
+  groupId: string,
+  name: string,
+): Promise<{ ok: true } | { ok: false; reason: "invalid-name" }> {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > MAX_NAME_LENGTH) return { ok: false, reason: "invalid-name" };
+  await sql`UPDATE groups SET name = ${trimmed} WHERE id = ${groupId}`;
+  return { ok: true };
+}
+
+export async function setGroupGames(groupId: string, gameIds: string[]): Promise<{ ok: true }> {
+  await sql`DELETE FROM group_games WHERE group_id = ${groupId}`;
+  for (const gameId of gameIds) {
+    await sql`INSERT INTO group_games (group_id, game_id) SELECT ${groupId}, id FROM games WHERE id = ${gameId} AND active = true ON CONFLICT DO NOTHING`;
+  }
+  return { ok: true };
+}
+
+export async function resetInvite(groupId: string): Promise<{ token: string }> {
+  const { token, tokenHash } = generateInviteToken();
+  await sql`UPDATE groups SET invite_token_hash = ${tokenHash} WHERE id = ${groupId}`;
+  return { token };
+}

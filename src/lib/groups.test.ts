@@ -6,8 +6,17 @@ vi.mock("@/lib/inviteToken", () => ({
   generateInviteToken: () => ({ token: "tok", tokenHash: "hash" }),
   hashInviteToken: (t: string) => `h(${t})`,
 }));
-const { createGroup, listMyGroups, joinViaToken, groupPreviewByToken, leaveGroup, removeMember } =
-  await import("./groups");
+const {
+  createGroup,
+  listMyGroups,
+  joinViaToken,
+  groupPreviewByToken,
+  leaveGroup,
+  removeMember,
+  renameGroup,
+  setGroupGames,
+  resetInvite,
+} = await import("./groups");
 beforeEach(() => { vi.clearAllMocks(); sqlMock.mockResolvedValue([]); });
 
 describe("createGroup", () => {
@@ -97,5 +106,32 @@ describe("removeMember", () => {
     expect(texts[0]).toContain("DELETE FROM memberships");
     expect(texts.some((t) => t.includes("UPDATE memberships SET role = 'admin'"))).toBe(true);
     expect(texts.some((t) => t.includes("DELETE FROM groups"))).toBe(true);
+  });
+});
+
+describe("renameGroup", () => {
+  it("empty → invalid-name, no update", async () => {
+    expect(await renameGroup("g1", "  ")).toEqual({ ok: false, reason: "invalid-name" });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+  it("valid trims + updates", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    expect(await renameGroup("g1", " Fam ")).toEqual({ ok: true });
+    expect(sqlMock.mock.calls[0].slice(1)).toContain("Fam");
+  });
+});
+describe("setGroupGames", () => {
+  it("clears then inserts", async () => {
+    sqlMock.mockResolvedValue([]);
+    await setGroupGames("g1", ["wordle"]);
+    const texts = sqlMock.mock.calls.map((c) => String(c[0].join("?")));
+    expect(texts[0]).toContain("DELETE FROM group_games");
+    expect(texts.some((t) => t.includes("INSERT INTO group_games"))).toBe(true);
+  });
+});
+describe("resetInvite", () => {
+  it("returns a token and updates the hash", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    expect(await resetInvite("g1")).toEqual({ token: "tok" }); // per generateInviteToken mock
   });
 });
