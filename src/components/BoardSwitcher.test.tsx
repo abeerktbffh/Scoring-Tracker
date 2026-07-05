@@ -87,7 +87,7 @@ describe("BoardSwitcher", () => {
     expect(select).toHaveBeenCalledWith(null);
   });
 
-  it("calls onNewGroup when 'New group' is clicked", () => {
+  it("calls onNewGroup and closes the menu when 'New group' is clicked", () => {
     setBoard();
     const onNewGroup = vi.fn();
     render(<BoardSwitcher onNewGroup={onNewGroup} />);
@@ -96,6 +96,7 @@ describe("BoardSwitcher", () => {
     fireEvent.click(within(screen.getByTestId("menu-panel")).getByText(/new group/i));
 
     expect(onNewGroup).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("menu-panel").getAttribute("aria-hidden")).toBe("true");
   });
 
   it("shows a checkmark next to the selected board", () => {

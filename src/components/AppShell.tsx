@@ -2,15 +2,16 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getGames } from "@/lib/api";
-import { useTheme } from "@/design/theme";
+import { useTheme, type Theme } from "@/design/theme";
 import { MenuIcon } from "@/design/icons";
 import { SignInGate } from "./SignInGate";
 import { Onboarding } from "./Onboarding";
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
-import { BoardProvider } from "./BoardContext";
+import { BoardProvider, useBoard } from "./BoardContext";
 import { BoardSwitcher } from "./BoardSwitcher";
 import { GroupOverflowMenu } from "./GroupOverflowMenu";
+import { CreateGroup } from "./CreateGroup";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -128,38 +129,91 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
 
   return (
     <BoardProvider>
-      <div>
-        <header className={styles.topBar}>
-          <button
-            type="button"
-            className={styles.menuButton}
-            aria-label="Open menu"
-            onClick={() => setDrawerOpen(true)}
-          >
-            <MenuIcon size={22} />
-          </button>
-
-          <BoardSwitcher onNewGroup={() => setCreateOpen(true)} />
-
-          <GroupOverflowMenu onManage={() => setManageOpen(true)} />
-        </header>
-
-        <main className={styles.content}>{children}</main>
-
-        <TabBar active={activeFromPathname(pathname)} />
-
-        <Drawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          theme={theme}
-          setTheme={setTheme}
-        />
-
-        {/* CreateGroup overlay: Task 6 */}
-        {createOpen && null}
-        {/* ManageGroup overlay: Task 9 */}
-        {manageOpen && null}
-      </div>
+      <ShellContent
+        drawerOpen={drawerOpen}
+        setDrawerOpen={setDrawerOpen}
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        manageOpen={manageOpen}
+        setManageOpen={setManageOpen}
+        theme={theme}
+        setTheme={setTheme}
+        pathname={pathname}
+      >
+        {children}
+      </ShellContent>
     </BoardProvider>
+  );
+}
+
+interface ShellContentProps {
+  children: React.ReactNode;
+  drawerOpen: boolean;
+  setDrawerOpen: (open: boolean) => void;
+  createOpen: boolean;
+  setCreateOpen: (open: boolean) => void;
+  manageOpen: boolean;
+  setManageOpen: (open: boolean) => void;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+  pathname: string | null;
+}
+
+// Rendered inside BoardProvider so it (and the overlays it mounts) can call useBoard().
+function ShellContent({
+  children,
+  drawerOpen,
+  setDrawerOpen,
+  createOpen,
+  setCreateOpen,
+  manageOpen,
+  setManageOpen,
+  theme,
+  setTheme,
+  pathname,
+}: ShellContentProps): JSX.Element {
+  const board = useBoard();
+
+  return (
+    <div>
+      <header className={styles.topBar}>
+        <button
+          type="button"
+          className={styles.menuButton}
+          aria-label="Open menu"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <MenuIcon size={22} />
+        </button>
+
+        <BoardSwitcher onNewGroup={() => setCreateOpen(true)} />
+
+        <GroupOverflowMenu onManage={() => setManageOpen(true)} />
+      </header>
+
+      <main className={styles.content}>{children}</main>
+
+      <TabBar active={activeFromPathname(pathname)} />
+
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        theme={theme}
+        setTheme={setTheme}
+      />
+
+      <CreateGroup
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => {
+          board.select(id);
+          board.refresh();
+          setCreateOpen(false);
+        }}
+      />
+
+      {/* ManageGroup overlay: Task 9 */}
+      {manageOpen && null}
+    </div>
   );
 }

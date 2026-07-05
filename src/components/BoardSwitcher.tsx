@@ -20,6 +20,11 @@ export function BoardSwitcher({ onNewGroup }: BoardSwitcherProps): JSX.Element {
     setOpen(false);
   }
 
+  function handleNewGroup() {
+    setOpen(false);
+    onNewGroup();
+  }
+
   return (
     <>
       <button
@@ -51,7 +56,7 @@ export function BoardSwitcher({ onNewGroup }: BoardSwitcherProps): JSX.Element {
           </MenuItem>
         ))}
         <div className={styles.divider} />
-        <MenuItem onClick={onNewGroup}>
+        <MenuItem onClick={handleNewGroup}>
           <span className={styles.newGroup}>+ New group</span>
         </MenuItem>
       </Menu>
