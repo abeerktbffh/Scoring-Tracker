@@ -2,6 +2,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getGames } from "@/lib/api";
+import { saveName } from "@/lib/rememberMe";
 import { useTheme, type Theme } from "@/design/theme";
 import { MenuIcon } from "@/design/icons";
 import { SignInGate } from "./SignInGate";
@@ -109,6 +110,11 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
       body: JSON.stringify({ displayName }),
     });
     if (res.ok) {
+      // Belt-and-suspenders: the rename flow is the only other writer of this
+      // cache, so a brand-new user would otherwise have no localStorage name
+      // until they explicitly renamed. Server session remains the source of
+      // truth for viewer identity; this just keeps the device-local cache warm.
+      saveName(displayName);
       await refreshOnboarding();
     }
     return res.ok;

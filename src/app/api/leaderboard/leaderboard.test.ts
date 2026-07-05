@@ -62,6 +62,7 @@ describe("GET /api/leaderboard", () => {
       window: "daily",
       locked: false,
       players: [{ displayName: "Session Player", wins: 1, gamesPlayed: 1, winRate: 1 }],
+      viewerName: "Session Player",
     });
 
     // Query joins `users` (not `players`) and has no group_id filter.

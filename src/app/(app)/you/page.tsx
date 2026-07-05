@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
-import { loadName, saveName } from "@/lib/rememberMe";
+import { saveName } from "@/lib/rememberMe";
 import { toDayNumber } from "@/lib/day";
 import { Card } from "@/components/Card";
 import { StatCard } from "@/components/StatCard";
@@ -37,39 +37,35 @@ function relativeDay(dateStr: string, todayStr: string): string {
 }
 
 export default function You(): JSX.Element {
-  const [name, setName] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
-  const load = useCallback((displayName: string | null) => {
+  const load = useCallback(() => {
     setState({ status: "loading" });
-    Promise.all([getMe(displayName ?? ""), getLeaderboard("weekly", displayName ?? undefined)]).then(
-      ([meResult, leaderboardResult]) => {
-        if (!meResult.ok) {
-          setState({ status: "error", message: meResult.error });
-          return;
-        }
-        if (!leaderboardResult.ok) {
-          setState({ status: "error", message: leaderboardResult.error });
-          return;
-        }
-        setState({ status: "ready", me: meResult.data, rows: leaderboardResult.data.players });
+    // The `player` arg is a legacy param the server ignores — viewer identity
+    // (me.displayName) is resolved from the session, not this client value.
+    Promise.all([getMe(""), getLeaderboard("weekly")]).then(([meResult, leaderboardResult]) => {
+      if (!meResult.ok) {
+        setState({ status: "error", message: meResult.error });
+        return;
       }
-    );
+      if (!leaderboardResult.ok) {
+        setState({ status: "error", message: leaderboardResult.error });
+        return;
+      }
+      setState({ status: "ready", me: meResult.data, rows: leaderboardResult.data.players });
+    });
   }, []);
 
   useEffect(() => {
-    const displayName = loadName();
-    setName(displayName);
-    load(displayName);
+    load();
   }, [load]);
 
-  const handleRetry = useCallback(() => load(name), [load, name]);
+  const handleRetry = useCallback(() => load(), [load]);
 
   const handleRenamed = useCallback(
     (newName: string) => {
-      setName(newName);
       saveName(newName);
-      load(newName);
+      load();
     },
     [load]
   );
@@ -99,7 +95,7 @@ export default function You(): JSX.Element {
       {state.status === "error" && <ErrorState message={state.message} onRetry={handleRetry} />}
 
       {state.status === "ready" && (
-        <YouReady me={state.me} rows={state.rows} name={name} onRenamed={handleRenamed} />
+        <YouReady me={state.me} rows={state.rows} onRenamed={handleRenamed} />
       )}
     </div>
   );
@@ -108,11 +104,14 @@ export default function You(): JSX.Element {
 interface YouReadyProps {
   me: MeResponse;
   rows: OverallRow[];
-  name: string | null;
   onRenamed: (newName: string) => void;
 }
 
-function YouReady({ me, rows, name, onRenamed }: YouReadyProps): JSX.Element {
+function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
+  // Viewer identity comes from the server session (me.displayName), never
+  // localStorage — a brand-new user has no localStorage name but the header
+  // must still show their name as soon as the server knows it.
+  const name = me.displayName;
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [isSaving, setIsSaving] = useState(false);

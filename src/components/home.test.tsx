@@ -4,17 +4,12 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import Home from "@/app/(app)/page";
 import { getMe, getLeaderboard } from "@/lib/api";
-import { loadName } from "@/lib/rememberMe";
 import { useBoard } from "@/components/BoardContext";
 import type { MeResponse, OverallRow } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   getMe: vi.fn(),
   getLeaderboard: vi.fn(),
-}));
-
-vi.mock("@/lib/rememberMe", () => ({
-  loadName: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -27,9 +22,10 @@ vi.mock("@/components/BoardContext", () => ({
 
 const mockedGetMe = vi.mocked(getMe);
 const mockedGetLeaderboard = vi.mocked(getLeaderboard);
-const mockedLoadName = vi.mocked(loadName);
 const mockedUseBoard = vi.mocked(useBoard);
 
+// Viewer identity now comes from the server (me.displayName / leaderboard's
+// viewerName), never from localStorage — these fixtures reflect that.
 const meResponse: MeResponse = {
   today: {
     date: "2026-07-03",
@@ -48,6 +44,7 @@ const meResponse: MeResponse = {
     { gameId: "connections", name: "Connections", currentStreak: 3, longestStreak: 5 },
   ],
   recent: [],
+  displayName: "You",
 };
 
 const leaderboardRows: OverallRow[] = [
@@ -70,8 +67,6 @@ function setBoard(boardId: string | null) {
 beforeEach(() => {
   mockedGetMe.mockReset();
   mockedGetLeaderboard.mockReset();
-  mockedLoadName.mockReset();
-  mockedLoadName.mockReturnValue("You");
   mockedUseBoard.mockReset();
   setBoard(null);
 });
@@ -106,7 +101,7 @@ describe("Home", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     const { container } = render(<Home />);
@@ -123,11 +118,11 @@ describe("Home", () => {
     expect(empty.length).toBe(2);
   });
 
-  it("renders the standings snapshot with the user's row highlighted", async () => {
+  it("renders the standings snapshot with the user's row highlighted, identified via the server-provided displayName", async () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     render(<Home />);
@@ -143,7 +138,7 @@ describe("Home", () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     render(<Home />);
@@ -155,7 +150,7 @@ describe("Home", () => {
     mockedGetMe.mockResolvedValue({ ok: false, error: "Something went wrong — try again.", status: 500 });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: leaderboardRows },
+      data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
     });
 
     const { container } = render(<Home />);
@@ -171,20 +166,44 @@ describe("Home", () => {
     await waitFor(() => expect(container.textContent).toMatch(/3\s*of\s*5/i));
   });
 
-  it("shows an EmptyState when there is no remembered name yet", async () => {
-    mockedLoadName.mockReturnValue(null);
+  it("shows an EmptyState when nothing has been logged yet (totalCount 0), independent of viewer identity", async () => {
     mockedGetMe.mockResolvedValue({
       ok: true,
-      data: { ...meResponse, today: { ...meResponse.today, loggedCount: 0, totalCount: 0, games: [] } },
+      data: {
+        ...meResponse,
+        today: { ...meResponse.today, loggedCount: 0, totalCount: 0, games: [] },
+        // A brand-new user has no display name recorded yet either.
+        displayName: null,
+      },
     });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
-      data: { window: "weekly", locked: false, players: [] },
+      data: { window: "weekly", locked: false, players: [], viewerName: null },
     });
 
     render(<Home />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: /log today's puzzle/i })).toBeTruthy());
+  });
+
+  describe("viewer identity for a brand-new user (no localStorage name)", () => {
+    // Regression guard: Home no longer reads localStorage for viewer identity
+    // at all — it must identify "me" purely from the server-provided
+    // displayName, which is what a freshly-onboarded user has instead of a
+    // localStorage entry (only ever written by the rename flow).
+    it("highlights the viewer's row using me.displayName even though nothing was ever written to localStorage", async () => {
+      mockedGetMe.mockResolvedValue({ ok: true, data: { ...meResponse, displayName: "Devanshi" } });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "Devanshi" },
+      });
+
+      render(<Home />);
+
+      await waitFor(() => expect(screen.getByText("Devanshi")).toBeTruthy());
+      const myRow = screen.getByText("Devanshi").closest("tr");
+      expect(myRow?.className).toMatch(/me/i);
+    });
   });
 
   describe("group-aware empty state", () => {
@@ -196,7 +215,7 @@ describe("Home", () => {
       });
       mockedGetLeaderboard.mockResolvedValue({
         ok: true,
-        data: { window: "weekly", locked: false, players: [] },
+        data: { window: "weekly", locked: false, players: [], viewerName: "You" },
       });
 
       render(<Home />);
@@ -222,7 +241,7 @@ describe("Home", () => {
       });
       mockedGetLeaderboard.mockResolvedValue({
         ok: true,
-        data: { window: "weekly", locked: false, players: [] },
+        data: { window: "weekly", locked: false, players: [], viewerName: "You" },
       });
 
       const { container } = render(<Home />);
@@ -234,14 +253,17 @@ describe("Home", () => {
 
     it("keeps the existing global first-run copy when the global board's catalog is empty", async () => {
       setBoard(null);
-      mockedLoadName.mockReturnValue(null);
       mockedGetMe.mockResolvedValue({
         ok: true,
-        data: { ...meResponse, today: { ...meResponse.today, loggedCount: 0, totalCount: 0, games: [] } },
+        data: {
+          ...meResponse,
+          today: { ...meResponse.today, loggedCount: 0, totalCount: 0, games: [] },
+          displayName: null,
+        },
       });
       mockedGetLeaderboard.mockResolvedValue({
         ok: true,
-        data: { window: "weekly", locked: false, players: [] },
+        data: { window: "weekly", locked: false, players: [], viewerName: null },
       });
 
       render(<Home />);
@@ -256,7 +278,7 @@ describe("Home", () => {
       mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
       mockedGetLeaderboard.mockResolvedValue({
         ok: true,
-        data: { window: "weekly", locked: false, players: leaderboardRows },
+        data: { window: "weekly", locked: false, players: leaderboardRows, viewerName: "You" },
       });
     });
 
@@ -265,8 +287,8 @@ describe("Home", () => {
 
       render(<Home />);
 
-      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", undefined));
-      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", undefined);
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("", undefined));
+      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, undefined);
     });
 
     it("calls getMe/getLeaderboard with the selected group id", async () => {
@@ -274,8 +296,8 @@ describe("Home", () => {
 
       render(<Home />);
 
-      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", "g1"));
-      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g1");
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("", "g1"));
+      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, "g1");
     });
 
     it("refetches when the selected board changes", async () => {
@@ -283,13 +305,13 @@ describe("Home", () => {
 
       const { rerender } = render(<Home />);
 
-      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", undefined));
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("", undefined));
 
       setBoard("g2");
       rerender(<Home />);
 
-      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", "g2"));
-      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g2");
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("", "g2"));
+      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", undefined, "g2");
     });
   });
 });

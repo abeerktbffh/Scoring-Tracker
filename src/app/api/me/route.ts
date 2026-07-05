@@ -84,5 +84,5 @@ export async function GET(req: Request) {
   }));
 
   const result = computeMe({ today, games, entries });
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, displayName: guard.viewer.displayName ?? null });
 }

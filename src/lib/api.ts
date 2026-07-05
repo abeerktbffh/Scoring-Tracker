@@ -47,6 +47,7 @@ export interface MeResponse {
     solved: boolean;
     puzzleDate: string;
   }[];
+  displayName: string | null;
 }
 
 export interface NewGameInput {
@@ -133,7 +134,7 @@ export function getLeaderboard(
   window?: string,
   player?: string,
   group?: string
-): Promise<ApiResult<{ window: string; locked: boolean; players: OverallRow[] }>> {
+): Promise<ApiResult<{ window: string; locked: boolean; players: OverallRow[]; viewerName: string | null }>> {
   const params = new URLSearchParams();
   if (window !== undefined) params.set("window", window);
   if (player !== undefined) params.set("player", player);
@@ -147,7 +148,9 @@ export function getBoard(
   window?: string,
   player?: string,
   group?: string
-): Promise<ApiResult<{ gameId: string; window: string; locked: boolean; players: GameBoardRow[] }>> {
+): Promise<
+  ApiResult<{ gameId: string; window: string; locked: boolean; players: GameBoardRow[]; viewerName: string | null }>
+> {
   const params = new URLSearchParams();
   if (window !== undefined) params.set("window", window);
   if (player !== undefined) params.set("player", player);
