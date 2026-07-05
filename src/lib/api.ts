@@ -246,3 +246,9 @@ export function resetGroupInvite(groupId: string): Promise<ApiResult<{ link: str
 export function getGroupInvite(groupId: string): Promise<ApiResult<{ link: string }>> {
   return request(`/api/groups/${encodeURIComponent(groupId)}/invite`);
 }
+
+export function getGroupMembers(
+  groupId: string
+): Promise<ApiResult<{ members: { userId: string; displayName: string | null; role: "admin" | "member" }[] }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/members`);
+}

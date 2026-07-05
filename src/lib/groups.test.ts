@@ -17,6 +17,7 @@ const {
   setGroupGames,
   resetInvite,
   getGroupInvite,
+  listGroupMembers,
 } = await import("./groups");
 beforeEach(() => { vi.clearAllMocks(); sqlMock.mockResolvedValue([]); });
 
@@ -152,6 +153,32 @@ describe("resetInvite", () => {
     expect(sqlText).toContain("invite_token = ?");
     expect(sqlMock.mock.calls[0].slice(1)).toContain("hash");
     expect(sqlMock.mock.calls[0].slice(1)).toContain("tok");
+  });
+});
+
+describe("listGroupMembers", () => {
+  it("maps joined rows to {userId,displayName,role}", async () => {
+    sqlMock.mockResolvedValueOnce([
+      { user_id: "u1", display_name: "Ada", role: "admin" },
+      { user_id: "u2", display_name: "Bea", role: "member" },
+    ]);
+    expect(await listGroupMembers("g1")).toEqual([
+      { userId: "u1", displayName: "Ada", role: "admin" },
+      { userId: "u2", displayName: "Bea", role: "member" },
+    ]);
+  });
+  it("joins memberships to users and orders admins first, then by name", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    await listGroupMembers("g1");
+    const sqlText = sqlMock.mock.calls[0][0].join("?");
+    expect(sqlText).toContain("JOIN users");
+    expect(sqlText).toContain("FROM memberships");
+    expect(sqlText).toContain("ORDER BY");
+    expect(sqlMock.mock.calls[0].slice(1)).toContain("g1");
+  });
+  it("passes through a null display_name", async () => {
+    sqlMock.mockResolvedValueOnce([{ user_id: "u1", display_name: null, role: "member" }]);
+    expect(await listGroupMembers("g1")).toEqual([{ userId: "u1", displayName: null, role: "member" }]);
   });
 });
 

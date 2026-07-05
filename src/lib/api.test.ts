@@ -12,6 +12,7 @@ import {
   leaveGroup,
   resetGroupInvite,
   getGroupInvite,
+  getGroupMembers,
   getLeaderboard,
   getBoard,
   getMe,
@@ -167,6 +168,18 @@ describe("group client fns", () => {
     const result = await getGroupInvite("g1");
     expect(fetchMock).toHaveBeenCalledWith("/api/groups/g1/invite", undefined);
     expect(result).toEqual({ ok: true, data: { link: "http://x/?join=tok3" } });
+  });
+
+  it("getGroupMembers GETs /api/groups/:id/members", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, { members: [{ userId: "u1", displayName: "Ada", role: "admin" }] })
+    );
+    const result = await getGroupMembers("g1");
+    expect(fetchMock).toHaveBeenCalledWith("/api/groups/g1/members", undefined);
+    expect(result).toEqual({
+      ok: true,
+      data: { members: [{ userId: "u1", displayName: "Ada", role: "admin" }] },
+    });
   });
 
   it("URL-encodes ids containing special characters", async () => {

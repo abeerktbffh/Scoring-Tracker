@@ -115,6 +115,18 @@ export async function resetInvite(groupId: string): Promise<{ token: string }> {
   return { token };
 }
 
+export async function listGroupMembers(
+  groupId: string,
+): Promise<{ userId: string; displayName: string | null; role: "admin" | "member" }[]> {
+  const rows = (await sql`
+    SELECT m.user_id, u.display_name, m.role FROM memberships m
+    JOIN users u ON u.id = m.user_id
+    WHERE m.group_id = ${groupId}
+    ORDER BY (m.role = 'admin') DESC, u.display_name
+  `) as { user_id: string; display_name: string | null; role: "admin" | "member" }[];
+  return rows.map((r) => ({ userId: r.user_id, displayName: r.display_name, role: r.role }));
+}
+
 export async function getGroupInvite(groupId: string): Promise<{ token: string } | null> {
   const rows = (await sql`SELECT invite_token FROM groups WHERE id = ${groupId}`) as { invite_token: string | null }[];
   const token = rows[0]?.invite_token;
