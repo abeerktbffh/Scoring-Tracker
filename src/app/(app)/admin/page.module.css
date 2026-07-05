@@ -137,30 +137,3 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-
-.claimInfo {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  gap: 2px;
-}
-
-.inviteResult {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.inviteLink {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--tile-empty);
-  border: 1.3px solid var(--line);
-  border-radius: var(--r-tile);
-  padding: var(--space-2) var(--space-3);
-  word-break: break-all;
-  width: 100%;
-}

@@ -174,29 +174,3 @@ export function renameSelf(
 ): Promise<ApiResult<{ ok: true; displayName: string }>> {
   return request("/api/me/rename", jsonPost({ newName }));
 }
-
-export interface PendingClaim {
-  id: string;
-  playerId: string;
-  playerDisplayName: string;
-  claimedByUserId: string;
-  claimedByEmail: string | null;
-  claimedAt: string;
-}
-
-export function getPendingClaims(): Promise<ApiResult<{ claims: PendingClaim[] }>> {
-  return request("/api/admin/claims");
-}
-
-export type ClaimDecision = "approve" | "reject";
-
-export function decideClaim(
-  claimId: string,
-  decision: ClaimDecision
-): Promise<ApiResult<{ ok: true }>> {
-  return request(`/api/admin/claims/${encodeURIComponent(claimId)}`, jsonPost({ decision }));
-}
-
-export function createInvite(): Promise<ApiResult<{ token: string; link: string }>> {
-  return request("/api/invites", jsonPost({}));
-}

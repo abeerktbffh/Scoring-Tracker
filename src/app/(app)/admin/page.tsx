@@ -1,13 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  getPlayers,
-  postAdminGame,
-  getPendingClaims,
-  decideClaim,
-  createInvite,
-} from "@/lib/api";
-import type { Player, PendingClaim, ClaimDecision } from "@/lib/api";
+import { getPlayers, postAdminGame } from "@/lib/api";
+import type { Player } from "@/lib/api";
 import { loadName } from "@/lib/rememberMe";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -20,11 +14,6 @@ type PlayersState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; players: Player[] };
-
-type ClaimsState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; claims: PendingClaim[] };
 
 interface NewGameForm {
   id: string;
@@ -54,14 +43,6 @@ export default function Admin(): JSX.Element {
   const [gameError, setGameError] = useState<string | null>(null);
   const [gameSuccess, setGameSuccess] = useState<string | null>(null);
 
-  const [claimsState, setClaimsState] = useState<ClaimsState>({ status: "loading" });
-  const [claimFeedback, setClaimFeedback] = useState<Record<string, string>>({});
-
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [inviteGenerating, setInviteGenerating] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteCopied, setInviteCopied] = useState(false);
-
   const loadPlayers = useCallback(() => {
     setPlayersState({ status: "loading" });
     getPlayers().then((result) => {
@@ -73,22 +54,10 @@ export default function Admin(): JSX.Element {
     });
   }, []);
 
-  const loadClaims = useCallback(() => {
-    setClaimsState({ status: "loading" });
-    getPendingClaims().then((result) => {
-      if (!result.ok) {
-        setClaimsState({ status: "error", message: result.error });
-        return;
-      }
-      setClaimsState({ status: "ready", claims: result.data.claims });
-    });
-  }, []);
-
   useEffect(() => {
     setRememberedName(loadName());
     loadPlayers();
-    loadClaims();
-  }, [loadPlayers, loadClaims]);
+  }, [loadPlayers]);
 
   async function handleAddGame(e: React.FormEvent) {
     e.preventDefault();
@@ -112,93 +81,9 @@ export default function Admin(): JSX.Element {
     }
   }
 
-  async function handleClaimDecision(claimId: string, decision: ClaimDecision) {
-    setClaimFeedback((prev) => ({ ...prev, [claimId]: "" }));
-    const result = await decideClaim(claimId, decision);
-    if (result.ok) {
-      loadClaims();
-    } else {
-      setClaimFeedback((prev) => ({ ...prev, [claimId]: result.error }));
-    }
-  }
-
-  async function handleGenerateInvite() {
-    setInviteError(null);
-    setInviteCopied(false);
-    setInviteGenerating(true);
-    const result = await createInvite();
-    setInviteGenerating(false);
-    if (result.ok) {
-      setInviteLink(result.data.link);
-    } else {
-      setInviteError(result.error);
-    }
-  }
-
-  async function handleCopyInvite() {
-    if (!inviteLink) return;
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      setInviteCopied(true);
-    } catch {
-      setInviteCopied(false);
-    }
-  }
-
   return (
     <div className={styles.wrap}>
       <h1 className={styles.pageTitle}>Admin</h1>
-
-      {claimsState.status === "ready" && claimsState.claims.length > 0 && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Pending claims</h2>
-          <Card>
-            {claimsState.claims.map((claim) => (
-              <div key={claim.id} className={styles.playerRow}>
-                <div className={styles.claimInfo}>
-                  <span>{claim.playerDisplayName}</span>
-                  <span className={styles.settingsNote}>{claim.claimedByEmail}</span>
-                </div>
-                <Button variant="primary" onClick={() => handleClaimDecision(claim.id, "approve")}>
-                  Approve
-                </Button>
-                <Button variant="ghost" onClick={() => handleClaimDecision(claim.id, "reject")}>
-                  Reject
-                </Button>
-                {claimFeedback[claim.id] && (
-                  <span className={styles.error}>{claimFeedback[claim.id]}</span>
-                )}
-              </div>
-            ))}
-          </Card>
-        </section>
-      )}
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Invites</h2>
-        <Card>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={handleGenerateInvite}
-            disabled={inviteGenerating}
-          >
-            {inviteGenerating ? "Generating…" : "Generate invite"}
-          </Button>
-          {inviteError && <p className={styles.error}>{inviteError}</p>}
-          {inviteLink && (
-            <div className={styles.inviteResult}>
-              <p className={styles.settingsNote}>
-                Copy this link now — it won&rsquo;t be shown again.
-              </p>
-              <code className={styles.inviteLink}>{inviteLink}</code>
-              <Button type="button" variant="ghost" onClick={handleCopyInvite}>
-                {inviteCopied ? "Copied!" : "Copy"}
-              </Button>
-            </div>
-          )}
-        </Card>
-      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Add a game</h2>
