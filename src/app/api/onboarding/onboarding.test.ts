@@ -67,6 +67,15 @@ describe("POST /api/onboarding", () => {
     expect(setDisplayNameMock).not.toHaveBeenCalled();
   });
 
+  it("400s a display name longer than 40 characters", async () => {
+    authMock.mockResolvedValue({ user: { id: "u3b" } });
+    const res = await POST(jsonRequest({ displayName: "a".repeat(41) }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Name must be 40 characters or fewer");
+    expect(setDisplayNameMock).not.toHaveBeenCalled();
+  });
+
   it("409s with a clean error when the name is taken", async () => {
     authMock.mockResolvedValue({ user: { id: "u4" } });
     setDisplayNameMock.mockResolvedValue({ ok: false, reason: "name-taken" });

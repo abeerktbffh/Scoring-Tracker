@@ -23,6 +23,9 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { displayName?: unknown };
   const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
   if (!displayName) return NextResponse.json({ error: "displayName required" }, { status: 400 });
+  if (displayName.length > 40) {
+    return NextResponse.json({ error: "Name must be 40 characters or fewer" }, { status: 400 });
+  }
 
   const result = await setDisplayName(userId, displayName);
   if (!result.ok) return NextResponse.json({ error: "That name is taken — pick another." }, { status: 409 });
