@@ -1,8 +1,9 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getLeaderboard, getBoard, getGames } from "@/lib/api";
 import type { OverallRow, GameBoardRow, Game } from "@/lib/api";
 import { loadName } from "@/lib/rememberMe";
+import { useBoard } from "@/components/BoardContext";
 import { sortPlayers } from "@/lib/leaderboardSort";
 import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
 import { Card } from "@/components/Card";
@@ -40,6 +41,7 @@ type GamesState =
   | { status: "ready"; games: Game[] };
 
 export default function Standings(): JSX.Element {
+  const { boardId } = useBoard();
   const [name, setName] = useState<string | null>(null);
   const [windowKey, setWindowKey] = useState<string>("weekly");
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
@@ -47,21 +49,25 @@ export default function Standings(): JSX.Element {
   const [gamesState, setGamesState] = useState<GamesState>({ status: "loading" });
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [board, setBoard] = useState<BoardState>({ status: "idle" });
+  const isFirstBoardLoad = useRef(true);
 
-  const loadOverall = useCallback((win: string, displayName: string | null) => {
-    setOverall({ status: "loading" });
-    getLeaderboard(win, displayName ?? undefined).then((result) => {
-      if (!result.ok) {
-        setOverall({ status: "error", message: result.error });
-        return;
-      }
-      setOverall({ status: "ready", locked: result.data.locked, rows: result.data.players });
-    });
-  }, []);
+  const loadOverall = useCallback(
+    (win: string, displayName: string | null) => {
+      setOverall({ status: "loading" });
+      getLeaderboard(win, displayName ?? undefined, boardId ?? undefined).then((result) => {
+        if (!result.ok) {
+          setOverall({ status: "error", message: result.error });
+          return;
+        }
+        setOverall({ status: "ready", locked: result.data.locked, rows: result.data.players });
+      });
+    },
+    [boardId]
+  );
 
   const loadGames = useCallback(() => {
     setGamesState({ status: "loading" });
-    getGames().then((result) => {
+    getGames(boardId ?? undefined).then((result) => {
       if (!result.ok) {
         setGamesState({ status: "error", message: result.error });
         return;
@@ -71,26 +77,39 @@ export default function Standings(): JSX.Element {
         setSelectedGameId((current) => current ?? result.data.games[0].id);
       }
     });
-  }, []);
+  }, [boardId]);
 
-  const loadBoard = useCallback((gameId: string, win: string, displayName: string | null) => {
-    setBoard({ status: "loading" });
-    getBoard(gameId, win, displayName ?? undefined).then((result) => {
-      if (!result.ok) {
-        setBoard({ status: "error", message: result.error });
-        return;
-      }
-      setBoard({ status: "ready", locked: result.data.locked, rows: result.data.players });
-    });
-  }, []);
+  const loadBoard = useCallback(
+    (gameId: string, win: string, displayName: string | null) => {
+      setBoard({ status: "loading" });
+      getBoard(gameId, win, displayName ?? undefined, boardId ?? undefined).then((result) => {
+        if (!result.ok) {
+          setBoard({ status: "error", message: result.error });
+          return;
+        }
+        setBoard({ status: "ready", locked: result.data.locked, rows: result.data.players });
+      });
+    },
+    [boardId]
+  );
 
   useEffect(() => {
     const displayName = loadName();
     setName(displayName);
+    if (isFirstBoardLoad.current) {
+      isFirstBoardLoad.current = false;
+    } else {
+      // The board changed: the games list is now scoped to the new group,
+      // so drop the old selection and let loadGames pick the new first game.
+      setSelectedGameId(null);
+      // Also drop any previously-loaded per-game board so a zero-games group
+      // (or the refetch window) doesn't keep showing the old board's table.
+      setBoard({ status: "idle" });
+    }
     loadOverall(windowKey, displayName);
     loadGames();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [boardId]);
 
   useEffect(() => {
     if (selectedGameId) {

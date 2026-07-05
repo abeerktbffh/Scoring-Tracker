@@ -253,3 +253,41 @@ export const MenuIcon = ({ size = 20, className }: IconProps): JSX.Element => (
     <path d="M3 6h18M3 12h18M3 18h18" />
   </svg>
 );
+
+/**
+ * ChevronDown icon (Dropdown indicator)
+ * Simple downward chevron for collapsible sections
+ */
+export const ChevronDown = ({ size = 20, className }: IconProps): JSX.Element => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);
+
+/**
+ * Ellipsis icon (More options indicator)
+ * Three vertical dots for menu/more-actions
+ */
+export const Ellipsis = ({ size = 20, className }: IconProps): JSX.Element => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    <circle cx="12" cy="5" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="12" cy="19" r="2" />
+  </svg>
+);

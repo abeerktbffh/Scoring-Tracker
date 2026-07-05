@@ -122,17 +122,22 @@ function jsonPost(body: unknown): RequestInit {
   };
 }
 
-export function getGames(): Promise<ApiResult<{ games: Game[] }>> {
-  return request("/api/games");
+export function getGames(group?: string): Promise<ApiResult<{ games: Game[] }>> {
+  const params = new URLSearchParams();
+  if (group !== undefined) params.set("group", group);
+  const qs = params.toString();
+  return request(`/api/games${qs ? `?${qs}` : ""}`);
 }
 
 export function getLeaderboard(
   window?: string,
-  player?: string
+  player?: string,
+  group?: string
 ): Promise<ApiResult<{ window: string; locked: boolean; players: OverallRow[] }>> {
   const params = new URLSearchParams();
   if (window !== undefined) params.set("window", window);
   if (player !== undefined) params.set("player", player);
+  if (group !== undefined) params.set("group", group);
   const qs = params.toString();
   return request(`/api/leaderboard${qs ? `?${qs}` : ""}`);
 }
@@ -140,11 +145,13 @@ export function getLeaderboard(
 export function getBoard(
   gameId: string,
   window?: string,
-  player?: string
+  player?: string,
+  group?: string
 ): Promise<ApiResult<{ gameId: string; window: string; locked: boolean; players: GameBoardRow[] }>> {
   const params = new URLSearchParams();
   if (window !== undefined) params.set("window", window);
   if (player !== undefined) params.set("player", player);
+  if (group !== undefined) params.set("group", group);
   const qs = params.toString();
   return request(`/api/games/${encodeURIComponent(gameId)}/board${qs ? `?${qs}` : ""}`);
 }
@@ -153,9 +160,10 @@ export function getPlayers(): Promise<ApiResult<{ players: Player[] }>> {
   return request("/api/players");
 }
 
-export function getMe(player: string): Promise<ApiResult<MeResponse>> {
+export function getMe(player: string, group?: string): Promise<ApiResult<MeResponse>> {
   const params = new URLSearchParams();
   params.set("player", player);
+  if (group !== undefined) params.set("group", group);
   return request(`/api/me?${params.toString()}`);
 }
 
@@ -169,41 +177,78 @@ export function postAdminGame(game: NewGameInput): Promise<ApiResult<{ game: Gam
   return request("/api/admin/games", jsonPost(game));
 }
 
-export function renamePlayer(
-  playerId: string,
-  newName: string
-): Promise<ApiResult<{ ok: true }>> {
-  return request("/api/admin/players/rename", jsonPost({ playerId, newName }));
-}
-
 export function renameSelf(
   newName: string
 ): Promise<ApiResult<{ ok: true; displayName: string }>> {
   return request("/api/me/rename", jsonPost({ newName }));
 }
 
-export interface PendingClaim {
-  id: string;
-  playerId: string;
-  playerDisplayName: string;
-  claimedByUserId: string;
-  claimedByEmail: string | null;
-  claimedAt: string;
+export function createGroup(
+  name: string,
+  gameIds: string[]
+): Promise<ApiResult<{ id: string; link: string }>> {
+  return request("/api/groups", jsonPost({ name, gameIds }));
 }
 
-export function getPendingClaims(): Promise<ApiResult<{ claims: PendingClaim[] }>> {
-  return request("/api/admin/claims");
+export function listMyGroups(): Promise<
+  ApiResult<{ groups: { id: string; name: string; role: "admin" | "member" }[] }>
+> {
+  return request("/api/groups");
 }
 
-export type ClaimDecision = "approve" | "reject";
+export function joinGroup(token: string): Promise<ApiResult<{ ok: true; groupId: string }>> {
+  return request("/api/groups/join", jsonPost({ token }));
+}
 
-export function decideClaim(
-  claimId: string,
-  decision: ClaimDecision
+export function getGroupPreview(
+  token: string
+): Promise<ApiResult<{ group: { id: string; name: string; memberCount: number; gameCount: number } }>> {
+  return request(`/api/groups/preview?token=${encodeURIComponent(token)}`);
+}
+
+export function renameGroup(groupId: string, name: string): Promise<ApiResult<{ ok: true }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteGroup(groupId: string): Promise<ApiResult<{ ok: true }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}`, { method: "DELETE" });
+}
+
+export function setGroupGames(
+  groupId: string,
+  gameIds: string[]
 ): Promise<ApiResult<{ ok: true }>> {
-  return request(`/api/admin/claims/${encodeURIComponent(claimId)}`, jsonPost({ decision }));
+  return request(`/api/groups/${encodeURIComponent(groupId)}/games`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gameIds }),
+  });
 }
 
-export function createInvite(): Promise<ApiResult<{ token: string; link: string }>> {
-  return request("/api/invites", jsonPost({}));
+export function removeMember(groupId: string, userId: string): Promise<ApiResult<{ ok: true }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function leaveGroup(groupId: string): Promise<ApiResult<{ ok: true }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/leave`, jsonPost({}));
+}
+
+export function resetGroupInvite(groupId: string): Promise<ApiResult<{ link: string }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/invite`, jsonPost({}));
+}
+
+export function getGroupInvite(groupId: string): Promise<ApiResult<{ link: string }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/invite`);
+}
+
+export function getGroupMembers(
+  groupId: string
+): Promise<ApiResult<{ members: { userId: string; displayName: string | null; role: "admin" | "member" }[] }>> {
+  return request(`/api/groups/${encodeURIComponent(groupId)}/members`);
 }

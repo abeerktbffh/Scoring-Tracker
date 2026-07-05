@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/db/client";
-import { requireMember } from "@/lib/membership";
-import { GROUP_ID } from "@/lib/group";
+import { requireUser } from "@/lib/membership";
 
 export const runtime = "nodejs";
 
 /**
- * Group-level access is now gated by session membership (`requireMember`),
- * not the legacy `group_token` cookie. `requireMember` re-resolves
- * membership from the DB on every call: no session -> 401, session but not
- * a member of the group -> 403.
+ * The players list is global and means "all named users" now that players
+ * and users are unified. Access is gated by session identity (`requireUser`),
+ * not group membership. `requireUser` re-resolves identity from the DB on
+ * every call: no session -> 401.
  */
 export async function GET() {
-  const guard = await requireMember();
+  const guard = await requireUser();
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
-  const groupId = GROUP_ID;
 
   const rows = (await sql`
-    SELECT id, display_name FROM players WHERE group_id = ${groupId} ORDER BY display_name
+    SELECT id, display_name FROM users WHERE display_name IS NOT NULL ORDER BY display_name
   `) as { id: string; display_name: string }[];
   return NextResponse.json({ players: rows.map((r) => ({ id: r.id, displayName: r.display_name })) });
 }

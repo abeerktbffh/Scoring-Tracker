@@ -5,6 +5,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import Home from "@/app/(app)/page";
 import { getMe, getLeaderboard } from "@/lib/api";
 import { loadName } from "@/lib/rememberMe";
+import { useBoard } from "@/components/BoardContext";
 import type { MeResponse, OverallRow } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
@@ -20,9 +21,14 @@ vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn() })),
 }));
 
+vi.mock("@/components/BoardContext", () => ({
+  useBoard: vi.fn(),
+}));
+
 const mockedGetMe = vi.mocked(getMe);
 const mockedGetLeaderboard = vi.mocked(getLeaderboard);
 const mockedLoadName = vi.mocked(loadName);
+const mockedUseBoard = vi.mocked(useBoard);
 
 const meResponse: MeResponse = {
   today: {
@@ -50,11 +56,24 @@ const leaderboardRows: OverallRow[] = [
   { displayName: "Devanshi", wins: 14, gamesPlayed: 18, winRate: 0.78 },
 ];
 
+function setBoard(boardId: string | null) {
+  mockedUseBoard.mockReturnValue({
+    boardId,
+    board: null,
+    groups: [],
+    loading: false,
+    select: vi.fn(),
+    refresh: vi.fn(),
+  });
+}
+
 beforeEach(() => {
   mockedGetMe.mockReset();
   mockedGetLeaderboard.mockReset();
   mockedLoadName.mockReset();
   mockedLoadName.mockReturnValue("You");
+  mockedUseBoard.mockReset();
+  setBoard(null);
 });
 
 afterEach(() => {
@@ -166,5 +185,47 @@ describe("Home", () => {
     render(<Home />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: /log today's puzzle/i })).toBeTruthy());
+  });
+
+  describe("board scoping", () => {
+    beforeEach(() => {
+      mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
+      mockedGetLeaderboard.mockResolvedValue({
+        ok: true,
+        data: { window: "weekly", locked: false, players: leaderboardRows },
+      });
+    });
+
+    it("calls getMe/getLeaderboard with undefined group when Global", async () => {
+      setBoard(null);
+
+      render(<Home />);
+
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", undefined));
+      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", undefined);
+    });
+
+    it("calls getMe/getLeaderboard with the selected group id", async () => {
+      setBoard("g1");
+
+      render(<Home />);
+
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", "g1"));
+      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g1");
+    });
+
+    it("refetches when the selected board changes", async () => {
+      setBoard(null);
+
+      const { rerender } = render(<Home />);
+
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", undefined));
+
+      setBoard("g2");
+      rerender(<Home />);
+
+      await waitFor(() => expect(mockedGetMe).toHaveBeenCalledWith("You", "g2"));
+      expect(mockedGetLeaderboard).toHaveBeenCalledWith("weekly", "You", "g2");
+    });
   });
 });

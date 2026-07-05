@@ -1,26 +1,35 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/db/client";
-import { requireMember } from "@/lib/membership";
-import { GROUP_ID } from "@/lib/group";
+import { requireUser, requireMember } from "@/lib/membership";
 
 export const runtime = "nodejs";
 
 /**
- * Group-level access is now gated by session membership (`requireMember`),
- * not the legacy `group_token` cookie. `requireMember` re-resolves
- * membership from the DB on every call: no session -> 401, session but not
- * a member of the group -> 403.
+ * The game catalog is global by default: access is gated by session identity
+ * (`requireUser`), not group membership. `requireUser` re-resolves identity
+ * from the DB on every call: no session -> 401.
+ *
+ * An optional `?group=<id>` scopes the catalog to that group's tracked
+ * games; access is then gated by `requireMember` (403 for non-members).
  */
-export async function GET() {
-  const guard = await requireMember();
+export async function GET(req: Request) {
+  const groupId = new URL(req.url).searchParams.get("group");
+  const guard = groupId ? await requireMember(groupId) : await requireUser();
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
-  const groupId = GROUP_ID;
 
-  const rows = (await sql`
-    SELECT id, name, type, metric_direction, has_variants
-    FROM games WHERE group_id = ${groupId} AND active = true
-    ORDER BY name
-  `) as {
+  const rows = (groupId
+    ? await sql`
+        SELECT g.id, g.name, g.type, g.metric_direction, g.has_variants
+        FROM games g
+        JOIN group_games gg ON gg.game_id = g.id AND gg.group_id = ${groupId}
+        WHERE g.active = true
+        ORDER BY g.name
+      `
+    : await sql`
+        SELECT id, name, type, metric_direction, has_variants
+        FROM games WHERE active = true
+        ORDER BY name
+      `) as {
     id: string;
     name: string;
     type: string;

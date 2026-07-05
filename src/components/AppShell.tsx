@@ -2,13 +2,18 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getGames } from "@/lib/api";
-import { useTheme } from "@/design/theme";
+import { useTheme, type Theme } from "@/design/theme";
 import { MenuIcon } from "@/design/icons";
 import { SignInGate } from "./SignInGate";
-import { NeedInvite } from "./NeedInvite";
 import { Onboarding } from "./Onboarding";
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
+import { BoardProvider, useBoard } from "./BoardContext";
+import { BoardSwitcher } from "./BoardSwitcher";
+import { GroupOverflowMenu } from "./GroupOverflowMenu";
+import { CreateGroup } from "./CreateGroup";
+import { JoinGroup } from "./JoinGroup";
+import { ManageGroup } from "./ManageGroup";
 import styles from "./AppShell.module.css";
 
 export interface AppShellProps {
@@ -17,9 +22,6 @@ export interface AppShellProps {
 
 interface OnboardingState {
   alreadyMember: boolean;
-  needsInvite: boolean;
-  migrationActive: boolean;
-  unclaimed: { id: string; displayName: string }[];
 }
 
 function activeFromPathname(pathname: string | null): string {
@@ -39,19 +41,6 @@ async function fetchOnboarding(): Promise<OnboardingState | null> {
   }
 }
 
-async function redeemInvite(token: string): Promise<void> {
-  try {
-    await fetch("/api/invites/redeem", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
-  } catch {
-    // Best-effort — the onboarding fetch that follows reflects real
-    // eligibility regardless of whether redemption succeeded here.
-  }
-}
-
 export function AppShell({ children }: AppShellProps): JSX.Element {
   return (
     <Suspense fallback={null}>
@@ -66,8 +55,9 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -93,12 +83,8 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
-    const invite = searchParams?.get("invite");
 
     (async () => {
-      if (invite) {
-        await redeemInvite(invite);
-      }
       const state = await fetchOnboarding();
       if (cancelled) return;
       setOnboarding(state);
@@ -108,9 +94,6 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
     return () => {
       cancelled = true;
     };
-    // Deliberately excludes searchParams from deps beyond the invite token
-    // captured on the run that follows `authed` becoming true.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
   async function refreshOnboarding() {
@@ -118,20 +101,11 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
     setOnboarding(state);
   }
 
-  async function handleClaim(playerId: string): Promise<boolean> {
-    const res = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "claim", playerId }),
-    });
-    return res.ok;
-  }
-
   async function handleCreate(displayName: string): Promise<boolean> {
     const res = await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", displayName }),
+      body: JSON.stringify({ displayName }),
     });
     if (res.ok) {
       await refreshOnboarding();
@@ -152,17 +126,64 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
   }
 
   if (onboarding && !onboarding.alreadyMember) {
-    if (onboarding.needsInvite) {
-      return <NeedInvite />;
+    return <Onboarding onCreate={handleCreate} />;
+  }
+
+  return (
+    <BoardProvider>
+      <ShellContent
+        drawerOpen={drawerOpen}
+        setDrawerOpen={setDrawerOpen}
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        manageOpen={manageOpen}
+        setManageOpen={setManageOpen}
+        theme={theme}
+        setTheme={setTheme}
+        pathname={pathname}
+      >
+        {children}
+      </ShellContent>
+    </BoardProvider>
+  );
+}
+
+interface ShellContentProps {
+  children: React.ReactNode;
+  drawerOpen: boolean;
+  setDrawerOpen: (open: boolean) => void;
+  createOpen: boolean;
+  setCreateOpen: (open: boolean) => void;
+  manageOpen: boolean;
+  setManageOpen: (open: boolean) => void;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+  pathname: string | null;
+}
+
+// Rendered inside BoardProvider so it (and the overlays it mounts) can call useBoard().
+function ShellContent({
+  children,
+  drawerOpen,
+  setDrawerOpen,
+  createOpen,
+  setCreateOpen,
+  manageOpen,
+  setManageOpen,
+  theme,
+  setTheme,
+  pathname,
+}: ShellContentProps): JSX.Element {
+  const board = useBoard();
+  const searchParams = useSearchParams();
+  const joinToken = searchParams?.get("join") ?? null;
+  const [joinDismissed, setJoinDismissed] = useState(false);
+
+  function clearJoinParam(): void {
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", window.location.pathname);
     }
-    return (
-      <Onboarding
-        migrationActive={onboarding.migrationActive}
-        unclaimed={onboarding.unclaimed}
-        onClaim={handleClaim}
-        onCreate={handleCreate}
-      />
-    );
+    setJoinDismissed(true);
   }
 
   return (
@@ -176,6 +197,10 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
         >
           <MenuIcon size={22} />
         </button>
+
+        <BoardSwitcher onNewGroup={() => setCreateOpen(true)} />
+
+        <GroupOverflowMenu onManage={() => setManageOpen(true)} />
       </header>
 
       <main className={styles.content}>{children}</main>
@@ -188,6 +213,38 @@ function AppShellInner({ children }: AppShellProps): JSX.Element {
         theme={theme}
         setTheme={setTheme}
       />
+
+      <CreateGroup
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => {
+          board.refresh().then(() => board.select(id));
+        }}
+      />
+
+      {manageOpen && board.board && (
+        <ManageGroup
+          groupId={board.board.id}
+          onClose={() => setManageOpen(false)}
+          onChanged={() => board.refresh()}
+          onDeleted={() => {
+            board.select(null);
+            board.refresh();
+            setManageOpen(false);
+          }}
+        />
+      )}
+
+      {joinToken && !joinDismissed && (
+        <JoinGroup
+          token={joinToken}
+          onClose={clearJoinParam}
+          onJoined={(groupId) => {
+            board.refresh().then(() => board.select(groupId));
+            clearJoinParam();
+          }}
+        />
+      )}
     </div>
   );
 }

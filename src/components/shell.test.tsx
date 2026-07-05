@@ -5,7 +5,21 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { TabBar } from "./TabBar";
 import { Drawer } from "./Drawer";
 import { AppShell } from "./AppShell";
-import { getGames } from "@/lib/api";
+import {
+  getGames,
+  listMyGroups,
+  createGroup,
+  getGroupInvite,
+  leaveGroup,
+  getGroupPreview,
+  joinGroup,
+  getGroupMembers,
+  renameGroup,
+  setGroupGames,
+  removeMember,
+  resetGroupInvite,
+  deleteGroup,
+} from "@/lib/api";
 import { signOut } from "next-auth/react";
 
 const mockSearchParams = new URLSearchParams();
@@ -15,8 +29,30 @@ vi.mock("next/navigation", () => ({
   useSearchParams: vi.fn(() => mockSearchParams),
 }));
 
+// The authed shell mounts BoardSwitcher, GroupOverflowMenu, and CreateGroup (inside
+// BoardProvider) regardless of which board is selected, so every group-related fn
+// they import from @/lib/api at module load must be stubbed here, even ones a given
+// test never exercises — otherwise "X is not a function" surfaces the moment a test
+// opens an overlay that calls it.
 vi.mock("@/lib/api", () => ({
   getGames: vi.fn(),
+  listMyGroups: vi.fn(),
+  createGroup: vi.fn(),
+  getGroupInvite: vi.fn(),
+  leaveGroup: vi.fn(),
+  getGroupPreview: vi.fn(),
+  joinGroup: vi.fn(),
+  getGroupMembers: vi.fn(),
+  renameGroup: vi.fn(),
+  setGroupGames: vi.fn(),
+  removeMember: vi.fn(),
+  resetGroupInvite: vi.fn(),
+  deleteGroup: vi.fn(),
+}));
+
+vi.mock("@/lib/currentBoard", () => ({
+  loadBoardId: vi.fn(() => null),
+  saveBoardId: vi.fn(),
 }));
 
 vi.mock("next-auth/react", () => ({
@@ -25,7 +61,19 @@ vi.mock("next-auth/react", () => ({
 }));
 
 const mockedGetGames = vi.mocked(getGames);
+const mockedListMyGroups = vi.mocked(listMyGroups);
+const mockedCreateGroup = vi.mocked(createGroup);
+const mockedGetGroupInvite = vi.mocked(getGroupInvite);
+const mockedLeaveGroup = vi.mocked(leaveGroup);
+const mockedGetGroupPreview = vi.mocked(getGroupPreview);
+const mockedJoinGroup = vi.mocked(joinGroup);
 const mockedSignOut = vi.mocked(signOut);
+const mockedGetGroupMembers = vi.mocked(getGroupMembers);
+const mockedRenameGroup = vi.mocked(renameGroup);
+const mockedSetGroupGames = vi.mocked(setGroupGames);
+const mockedRemoveMember = vi.mocked(removeMember);
+const mockedResetGroupInvite = vi.mocked(resetGroupInvite);
+const mockedDeleteGroup = vi.mocked(deleteGroup);
 
 function findPostCall(
   fetchMock: ReturnType<typeof vi.fn>,
@@ -52,9 +100,6 @@ function mockFetchWithOnboarding(onboarding: Record<string, unknown>) {
         ok: true,
         json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
       });
-    }
-    if (url.includes("/api/invites/redeem")) {
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
     }
     return Promise.resolve({ ok: true, json: async () => ({}) });
   });
@@ -83,6 +128,30 @@ beforeEach(() => {
     ok: true,
     json: async () => ({ credentials: { id: "credentials", name: "Credentials" } }),
   }) as unknown as typeof fetch;
+
+  // BoardProvider (mounted for the authed shell subtree) fetches groups on mount.
+  mockedListMyGroups.mockResolvedValue({ ok: true, data: { groups: [] } });
+
+  // CreateGroup / GroupOverflowMenu are always mounted (rendered as null/closed) inside
+  // the authed shell; default their API calls to succeed so opening an overlay never
+  // throws even in tests that don't care about the round-trip.
+  mockedCreateGroup.mockResolvedValue({
+    ok: true,
+    data: { id: "new-group-id", link: "https://example.com/invite/new-group-id" },
+  });
+  mockedGetGroupInvite.mockResolvedValue({
+    ok: true,
+    data: { link: "https://example.com/invite/existing-group" },
+  });
+  mockedLeaveGroup.mockResolvedValue({ ok: true, data: { ok: true } });
+
+  // JoinGroup (mounted only when a ?join= token is present) defaults to a benign
+  // preview/join pair so tests that don't exercise the join flow are unaffected.
+  mockedGetGroupPreview.mockResolvedValue({
+    ok: true,
+    data: { group: { id: "joined-group-id", name: "Family Night", memberCount: 4, gameCount: 3 } },
+  });
+  mockedJoinGroup.mockResolvedValue({ ok: true, data: { ok: true, groupId: "joined-group-id" } });
 });
 
 afterEach(() => {
@@ -159,15 +228,12 @@ describe("Drawer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("has a disabled 'coming soon' Group item and an Admin link", () => {
+  it("has an Admin link and no leftover Group stub", () => {
     render(<Drawer open={true} onClose={vi.fn()} theme="light" setTheme={vi.fn()} />);
-
-    const groupItem = screen.getByText(/group/i).closest("button, [disabled]");
-    expect(screen.getByText(/coming soon/i)).toBeTruthy();
 
     const adminLink = screen.getByText(/admin/i).closest("a");
     expect(adminLink?.getAttribute("href")).toBe("/admin");
-    expect(groupItem).toBeTruthy();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
 
@@ -189,9 +255,6 @@ describe("AppShell", () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     global.fetch = mockFetchWithOnboarding({
       alreadyMember: true,
-      needsInvite: false,
-      migrationActive: false,
-      unclaimed: [],
     }) as unknown as typeof fetch;
 
     render(
@@ -203,15 +266,15 @@ describe("AppShell", () => {
     await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
     expect(screen.getByRole("button", { name: /menu/i })).toBeTruthy();
     expect(screen.getAllByRole("link").length).toBeGreaterThan(0);
+    expect(mockedListMyGroups).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /global/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /group options/i })).toBeNull();
   });
 
-  it("shows the need-invite screen when needsInvite is true, without rendering the app", async () => {
+  it("shows the name-entry onboarding screen for a new user, without rendering the app", async () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     global.fetch = mockFetchWithOnboarding({
       alreadyMember: false,
-      needsInvite: true,
-      migrationActive: false,
-      unclaimed: [],
     }) as unknown as typeof fetch;
 
     render(
@@ -220,47 +283,14 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    await waitFor(() => expect(screen.getByText(/ask the group owner/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/display name/i)).toBeTruthy());
     expect(screen.queryByText("secret content")).toBeNull();
   });
 
-  it("shows the claim list when migrationActive with unclaimed players, and POSTs a claim on selection", async () => {
+  it("supports the create-player path and POSTs {displayName}", async () => {
     mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
     const fetchMock = mockFetchWithOnboarding({
       alreadyMember: false,
-      needsInvite: false,
-      migrationActive: true,
-      unclaimed: [{ id: "p1", displayName: "Abeer" }],
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    render(
-      <AppShell>
-        <div>secret content</div>
-      </AppShell>
-    );
-
-    await waitFor(() => expect(screen.getByText("Abeer")).toBeTruthy());
-
-    fireEvent.click(screen.getByText("Abeer"));
-
-    await waitFor(() => {
-      const postCall = findPostCall(fetchMock, "/api/onboarding");
-      expect(postCall).toBeTruthy();
-      expect(JSON.parse(postCall![1].body as string)).toEqual({ action: "claim", playerId: "p1" });
-    });
-
-    await waitFor(() => expect(screen.getByText(/waiting for the owner/i)).toBeTruthy());
-    expect(screen.queryByText("secret content")).toBeNull();
-  });
-
-  it("supports the create-player path and POSTs {action: 'create', displayName}", async () => {
-    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
-    const fetchMock = mockFetchWithOnboarding({
-      alreadyMember: false,
-      needsInvite: false,
-      migrationActive: false,
-      unclaimed: [],
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -281,9 +311,143 @@ describe("AppShell", () => {
       const postCall = findPostCall(fetchMock, "/api/onboarding");
       expect(postCall).toBeTruthy();
       expect(JSON.parse(postCall![1].body as string)).toEqual({
-        action: "create",
         displayName: "Abeer",
       });
     });
+  });
+
+  it("opens the CreateGroup overlay when 'New group' is chosen from the board switcher", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+    expect(screen.queryByLabelText(/group name/i)).toBeNull();
+
+    // Global board (no groups) — trigger button is titled "Global".
+    fireEvent.click(screen.getByRole("button", { name: /global/i }));
+    fireEvent.click(screen.getByText(/new group/i));
+
+    await waitFor(() => expect(screen.getByLabelText(/group name/i)).toBeTruthy());
+    expect(screen.getByRole("button", { name: /^create$/i })).toBeTruthy();
+  });
+
+  it("keeps the CreateGroup overlay open on the invite-link screen after a successful create, and closes only on Done", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /global/i }));
+    fireEvent.click(screen.getByText(/new group/i));
+
+    await waitFor(() => expect(screen.getByLabelText(/group name/i)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(/group name/i), { target: { value: "Family Night" } });
+    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+
+    // Old (buggy) onCreated closed the overlay immediately, so the invite-link
+    // success screen never had a chance to render. It must stay mounted here.
+    await waitFor(() =>
+      expect(screen.getByText("https://example.com/invite/new-group-id")).toBeTruthy()
+    );
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^done$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("does not render the JoinGroup overlay when no ?join= token is present", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+    expect(mockedGetGroupPreview).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("renders the JoinGroup overlay when the URL has a ?join= token, and joining selects the group", async () => {
+    mockSearchParams.set("join", "tok-abc");
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+    const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(mockedGetGroupPreview).toHaveBeenCalledWith("tok-abc"));
+    expect(await screen.findByText(/join family night\?/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
+
+    await waitFor(() => expect(mockedJoinGroup).toHaveBeenCalledWith("tok-abc"));
+    await waitFor(() => expect(mockedListMyGroups).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(replaceStateSpy).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/join family night\?/i)).toBeNull());
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it("opens the ManageGroup overlay from the overflow menu when an admin group is selected", async () => {
+    mockedGetGames.mockResolvedValue({ ok: true, data: { games: [] } });
+    mockedGetGroupMembers.mockResolvedValue({ ok: true, data: { members: [] } });
+    mockedListMyGroups.mockResolvedValue({
+      ok: true,
+      data: { groups: [{ id: "g1", name: "Family Game Night", role: "admin" }] },
+    });
+    global.fetch = mockFetchWithOnboarding({
+      alreadyMember: true,
+    }) as unknown as typeof fetch;
+
+    render(
+      <AppShell>
+        <div>secret content</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("secret content")).toBeTruthy());
+
+    // Select the admin group from the board switcher.
+    fireEvent.click(screen.getByRole("button", { name: /global/i }));
+    fireEvent.click(screen.getByText("Family Game Night"));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /family game night/i })).toBeTruthy()
+    );
+
+    // Open the overflow menu and choose Manage.
+    fireEvent.click(screen.getByRole("button", { name: /group options/i }));
+    fireEvent.click(screen.getByText(/manage group/i));
+
+    await waitFor(() => expect(screen.getByTestId("manage-group-backdrop")).toBeTruthy());
+    expect(mockedGetGroupMembers).toHaveBeenCalledWith("g1");
   });
 });
