@@ -1,16 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const requireUserMock = vi.fn();
+const requireMemberMock = vi.fn();
 const sqlMock = vi.fn();
 
-vi.mock("@/lib/membership", () => ({ requireUser: requireUserMock }));
+vi.mock("@/lib/membership", () => ({
+  requireUser: requireUserMock,
+  requireMember: requireMemberMock,
+}));
 vi.mock("@/db/client", () => ({ sql: sqlMock }));
 
 // Imported after the mocks so the route picks up the mocked modules.
 const { GET } = await import("./route");
 
-function req(): Request {
-  return new Request("http://localhost/api/me");
+function req(url = "http://localhost/api/me"): Request {
+  return new Request(url);
 }
 
 const USER_VIEWER = {
@@ -71,5 +75,52 @@ describe("GET /api/me", () => {
     expect(res.status).toBe(200);
     // Exactly two queries: games + entries. No groups lookup, no skip.
     expect(sqlMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses requireUser and the global queries when ?group= is absent", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await GET(req());
+    expect(requireUserMock).toHaveBeenCalled();
+    expect(requireMemberMock).not.toHaveBeenCalled();
+  });
+
+  it("403s a non-member requesting ?group=g1, never touching the DB", async () => {
+    requireMemberMock.mockResolvedValue({ ok: false, status: 403, error: "Not a member" });
+
+    const res = await GET(req("http://localhost/api/me?group=g1"));
+    expect(res.status).toBe(403);
+    expect(requireMemberMock).toHaveBeenCalledWith("g1");
+    expect(requireUserMock).not.toHaveBeenCalled();
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  it("scopes both queries to the group and tracked-active games for a member", async () => {
+    requireMemberMock.mockResolvedValue(USER_VIEWER);
+    sqlMock
+      .mockResolvedValueOnce([{ id: "g_wordle", name: "Wordle" }])
+      .mockResolvedValueOnce([]);
+
+    const res = await GET(req("http://localhost/api/me?group=g1"));
+    expect(res.status).toBe(200);
+    expect(requireMemberMock).toHaveBeenCalledWith("g1");
+
+    const gamesCall = sqlMock.mock.calls[0];
+    const gamesQueryText = gamesCall[0].join(" ").replace(/\s+/g, " ");
+    expect(gamesQueryText).toMatch(
+      /AND id IN \( SELECT gg\.game_id FROM group_games gg JOIN games ga ON ga\.id = gg\.game_id AND ga\.active = true WHERE gg\.group_id = /,
+    );
+    expect(gamesCall.slice(1)).toContain("g1");
+
+    const entriesCall = sqlMock.mock.calls[1];
+    const entriesQueryText = entriesCall[0].join(" ").replace(/\s+/g, " ");
+    expect(entriesQueryText).toMatch(
+      /AND e\.user_id IN \(SELECT user_id FROM memberships WHERE group_id = /,
+    );
+    expect(entriesQueryText).toMatch(
+      /AND e\.game_id IN \( SELECT gg\.game_id FROM group_games gg JOIN games ga ON ga\.id = gg\.game_id AND ga\.active = true WHERE gg\.group_id = /,
+    );
+    expect(entriesCall.slice(1)).toContain("g1");
   });
 });
