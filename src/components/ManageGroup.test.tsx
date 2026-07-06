@@ -93,6 +93,7 @@ describe("ManageGroup", () => {
       <ManageGroup groupId="g1" onClose={vi.fn()} onChanged={vi.fn()} onDeleted={vi.fn()} />
     );
 
+    expect(screen.getByText(/^Manage$/i)).toBeTruthy();
     expect((screen.getByLabelText(/group name/i) as HTMLInputElement).value).toBe("Family Night");
 
     await waitFor(() => expect(screen.getByText("Abeer")).toBeTruthy());
