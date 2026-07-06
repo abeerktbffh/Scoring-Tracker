@@ -1,4 +1,5 @@
 import { isBetter, type GameEntry } from "./wins";
+import { type DatedGameEntry } from "./gameBoard";
 
 export type Medal = "gold" | "silver" | "bronze";
 
@@ -66,6 +67,53 @@ export function tallyMedals(entries: GameEntry[]): MedalTally[] {
   }
 
   return [...tally.values()].sort(
+    (a, b) =>
+      b.gold - a.gold ||
+      b.silver - a.silver ||
+      b.bronze - a.bronze ||
+      a.playerId.localeCompare(b.playerId),
+  );
+}
+
+export interface MedalBoardStat extends MedalCounts {
+  playerId: string;
+  gamesPlayed: number;
+  pb: number | null;
+}
+
+/**
+ * Aggregate per-game board over a window: medals (window), gamesPlayed
+ * (window), PB (best solved value ALL-TIME by direction). PURE.
+ */
+export function computeMedalBoard(entries: DatedGameEntry[], start: string | null): MedalBoardStat[] {
+  const inWindow = (d: string) => start === null || d >= start;
+  const windowed = entries.filter((e) => inWindow(e.puzzleDate));
+  const medals = new Map(tallyMedals(windowed).map((m) => [m.playerId, m]));
+
+  const byPlayer = new Map<string, DatedGameEntry[]>();
+  for (const e of entries) {
+    let g = byPlayer.get(e.playerId);
+    if (!g) {
+      g = [];
+      byPlayer.set(e.playerId, g);
+    }
+    g.push(e);
+  }
+
+  const rows: MedalBoardStat[] = [];
+  for (const [playerId, all] of byPlayer.entries()) {
+    const win = all.filter((e) => inWindow(e.puzzleDate));
+    if (win.length === 0) continue;
+    let pb: number | null = null;
+    for (const e of all) {
+      if (!e.solved) continue;
+      if (pb === null || isBetter(e.value, pb, e.direction)) pb = e.value;
+    }
+    const m = medals.get(playerId) ?? { gold: 0, silver: 0, bronze: 0 };
+    rows.push({ playerId, gold: m.gold, silver: m.silver, bronze: m.bronze, gamesPlayed: win.length, pb });
+  }
+
+  return rows.sort(
     (a, b) =>
       b.gold - a.gold ||
       b.silver - a.silver ||

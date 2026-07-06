@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { tallyMedals, type GameEntryLike } from "./medals";
+import { tallyMedals, computeMedalBoard, type GameEntryLike } from "./medals";
 import type { GameEntry } from "./wins";
+import type { DatedGameEntry } from "./gameBoard";
 
 const base = { gameId: "wordle", variant: null, puzzleKey: "wordle|1", direction: "lower_better" as const };
 
@@ -91,5 +92,32 @@ describe("tallyMedals", () => {
     expect(byId.a).toEqual({ playerId: "a", gold: 1, silver: 0, bronze: 0 });
     expect(byId.b).toEqual({ playerId: "b", gold: 0, silver: 0, bronze: 0 });
     expect(byId.c).toEqual({ playerId: "c", gold: 0, silver: 0, bronze: 0 });
+  });
+});
+
+describe("computeMedalBoard", () => {
+  const dg = (playerId: string, puzzleDate: string, value: number, solved = true): DatedGameEntry => ({
+    playerId, gameId: "wordle", variant: null, puzzleKey: `wordle|${puzzleDate}`,
+    value, solved, direction: "lower_better", puzzleDate,
+  });
+
+  it("ranks by medals over the window and reports played + all-time PB", () => {
+    const entries: DatedGameEntry[] = [
+      dg("a", "2026-07-05", 2), dg("b", "2026-07-05", 3),
+      dg("a", "2026-07-06", 4), dg("b", "2026-07-06", 3),
+      dg("a", "2026-06-01", 1), // out of window; still counts toward PB (all-time)
+    ];
+    const board = computeMedalBoard(entries, "2026-07-05");
+    // 07-05: a=2 gold, b=3 silver. 07-06: b=3 gold, a=4 silver.
+    // Both end gold:1 silver:1 bronze:0 → tie broken by playerId → a before b.
+    expect(board.map((r) => r.playerId)).toEqual(["a", "b"]);
+    const byId = Object.fromEntries(board.map((r) => [r.playerId, r]));
+    expect(byId.b).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, pb: 3 });
+    expect(byId.a).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, pb: 1 });
+  });
+
+  it("drops players with no in-window entries but PB stays all-time", () => {
+    const entries: DatedGameEntry[] = [dg("a", "2026-06-01", 5)];
+    expect(computeMedalBoard(entries, "2026-07-01")).toEqual([]);
   });
 });
