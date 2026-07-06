@@ -48,9 +48,9 @@ const meResponse: MeResponse = {
 };
 
 const leaderboardRows: OverallRow[] = [
-  { displayName: "DJ", wins: 18, gamesPlayed: 20, winRate: 0.9 },
-  { displayName: "You", wins: 16, gamesPlayed: 19, winRate: 0.84 },
-  { displayName: "Devanshi", wins: 14, gamesPlayed: 18, winRate: 0.78 },
+  { displayName: "DJ", gold: 18, silver: 0, bronze: 0, gamesPlayed: 20, gamesLed: [] },
+  { displayName: "You", gold: 16, silver: 0, bronze: 0, gamesPlayed: 19, gamesLed: [] },
+  { displayName: "Devanshi", gold: 14, silver: 0, bronze: 0, gamesPlayed: 18, gamesLed: [] },
 ];
 
 function setBoard(boardId: string | null) {

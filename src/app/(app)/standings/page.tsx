@@ -3,8 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getLeaderboard, getBoard, getGames } from "@/lib/api";
 import type { OverallRow, GameBoardRow, Game } from "@/lib/api";
 import { useBoard } from "@/components/BoardContext";
-import { sortPlayers } from "@/lib/leaderboardSort";
-import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
+import { sortByMedals } from "@/lib/leaderboardSort";
 import { Card } from "@/components/Card";
 import { Segmented } from "@/components/Segmented";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
@@ -46,7 +45,6 @@ export default function Standings(): JSX.Element {
   // name but is still identified as "me" as soon as the server knows it.
   const [viewerName, setViewerName] = useState<string | null>(null);
   const [windowKey, setWindowKey] = useState<string>("weekly");
-  const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
   const [overall, setOverall] = useState<OverallState>({ status: "loading" });
   const [gamesState, setGamesState] = useState<GamesState>({ status: "loading" });
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -160,12 +158,7 @@ export default function Standings(): JSX.Element {
           <EmptyState title="No standings yet" body="Once results are logged, the overall table will show up here." />
         )}
         {overall.status === "ready" && !overall.locked && overall.rows.length > 0 && (
-          <LeaderboardTable
-            rows={sortPlayers(overall.rows, sortKey)}
-            sortKey={sortKey}
-            onSort={setSortKey}
-            me={viewerName ?? undefined}
-          />
+          <LeaderboardTable rows={sortByMedals(overall.rows)} me={viewerName ?? undefined} />
         )}
       </Card>
 

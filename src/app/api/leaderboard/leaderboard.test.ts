@@ -61,7 +61,9 @@ describe("GET /api/leaderboard", () => {
     expect(body).toEqual({
       window: "daily",
       locked: false,
-      players: [{ displayName: "Session Player", wins: 1, gamesPlayed: 1, winRate: 1 }],
+      players: [
+        { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_wordle"] },
+      ],
       viewerName: "Session Player",
     });
 
@@ -198,5 +200,123 @@ describe("GET /api/leaderboard", () => {
     const body = await res.json();
     expect(body.locked).toBe(true);
     expect(body.players).toEqual([]);
+  });
+
+  it("computes a cross-game Overall medal tally (gold/silver/bronze, gamesPlayed, gamesLed) for window=weekly", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([
+      // Wordle: Session wins (lower is better).
+      {
+        user_id: "u_session",
+        display_name: "Session Player",
+        game_id: "g_wordle",
+        variant: null,
+        puzzle_date: "2026-07-01",
+        parsed_value: 3,
+        solved: true,
+        metric_direction: "lower_better",
+      },
+      {
+        user_id: "u_other",
+        display_name: "Other Player",
+        game_id: "g_wordle",
+        variant: null,
+        puzzle_date: "2026-07-01",
+        parsed_value: 5,
+        solved: true,
+        metric_direction: "lower_better",
+      },
+      // Connections (same puzzle day, so the two entries actually compete):
+      // Other wins (higher is better).
+      {
+        user_id: "u_other",
+        display_name: "Other Player",
+        game_id: "g_connections",
+        variant: null,
+        puzzle_date: "2026-07-01",
+        parsed_value: 10,
+        solved: true,
+        metric_direction: "higher_better",
+      },
+      {
+        user_id: "u_session",
+        display_name: "Session Player",
+        game_id: "g_connections",
+        variant: null,
+        puzzle_date: "2026-07-01",
+        parsed_value: 2,
+        solved: true,
+        metric_direction: "higher_better",
+      },
+    ]);
+    // Aggregate windows are never no-peek gated for this route's "daily"
+    // check (window !== "daily" skips the played-today query entirely).
+
+    const res = await GET(req("http://localhost/api/leaderboard?window=weekly"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.window).toBe("weekly");
+    expect(body.players).toEqual(
+      expect.arrayContaining([
+        {
+          displayName: "Session Player",
+          gold: 1,
+          silver: 1,
+          bronze: 0,
+          gamesPlayed: 2,
+          gamesLed: ["g_wordle"],
+        },
+        {
+          displayName: "Other Player",
+          gold: 1,
+          silver: 1,
+          bronze: 0,
+          gamesPlayed: 2,
+          gamesLed: ["g_connections"],
+        },
+      ]),
+    );
+    expect(body.players).toHaveLength(2);
+    // Aggregate windows (non-daily) skip the dedicated played-today query.
+    expect(sqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("today's Overall reflects only today's per-game winners (default daily window)", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([
+      {
+        user_id: "u_session",
+        display_name: "Session Player",
+        game_id: "g_wordle",
+        variant: null,
+        puzzle_date: "2026-07-01",
+        parsed_value: 3,
+        solved: true,
+        metric_direction: "lower_better",
+      },
+      {
+        user_id: "u_other",
+        display_name: "Other Player",
+        game_id: "g_connections",
+        variant: null,
+        puzzle_date: "2026-07-01",
+        parsed_value: 10,
+        solved: true,
+        metric_direction: "higher_better",
+      },
+    ]);
+    // Viewer has played g_wordle today, so g_wordle stays visible; without
+    // no-peek narrowing, g_connections would also count toward Other's gold.
+    sqlMock.mockResolvedValueOnce([{ game_id: "g_wordle" }]);
+
+    const res = await GET(req());
+    const body = await res.json();
+    expect(body.window).toBe("daily");
+    expect(body.locked).toBe(false);
+    // Only the visible (played-today) game's entries feed the Overall tally —
+    // Other Player's g_connections gold is hidden by no-peek.
+    expect(body.players).toEqual([
+      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_wordle"] },
+    ]);
   });
 });

@@ -1,13 +1,10 @@
 import React from "react";
 import type { OverallRow } from "@/lib/api";
-import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
 import { Crown } from "@/design/icons";
 import styles from "./LeaderboardTable.module.css";
 
 export interface LeaderboardTableProps {
   rows: OverallRow[];
-  sortKey: LeaderboardSortKey;
-  onSort: (key: LeaderboardSortKey) => void;
   me?: string;
   /**
    * Optional "your rank" row rendered below a visual gap, for when the viewer
@@ -17,13 +14,17 @@ export interface LeaderboardTableProps {
   viewerRow?: { row: OverallRow; rank: number };
 }
 
-const COLUMNS: { key: LeaderboardSortKey; label: string }[] = [
-  { key: "wins", label: "Wins" },
+// TODO(Task 17): this is a compile-safe stopgap for the medal-tally
+// `OverallRow` shape (gold/silver/bronze/gamesPlayed/gamesLed) — Task 17 owns
+// the real Overall board UI (columns, gamesLed display, styling).
+const COLUMNS: { key: "gold" | "silver" | "bronze" | "gamesPlayed"; label: string }[] = [
+  { key: "gold", label: "Gold" },
+  { key: "silver", label: "Silver" },
+  { key: "bronze", label: "Bronze" },
   { key: "gamesPlayed", label: "Played" },
-  { key: "winRate", label: "Win%" },
 ];
 
-export function LeaderboardTable({ rows, sortKey, onSort, me, viewerRow }: LeaderboardTableProps): JSX.Element {
+export function LeaderboardTable({ rows, me, viewerRow }: LeaderboardTableProps): JSX.Element {
   return (
     <table className={styles.table}>
       <thead>
@@ -32,14 +33,7 @@ export function LeaderboardTable({ rows, sortKey, onSort, me, viewerRow }: Leade
           <th className={styles.headerCell}>Player</th>
           {COLUMNS.map((col) => (
             <th key={col.key} className={styles.headerCell}>
-              <button
-                type="button"
-                className={styles.sortButton}
-                onClick={() => onSort(col.key)}
-                aria-current={sortKey === col.key ? "true" : undefined}
-              >
-                {col.label}
-              </button>
+              {col.label}
             </th>
           ))}
         </tr>
@@ -60,16 +54,17 @@ export function LeaderboardTable({ rows, sortKey, onSort, me, viewerRow }: Leade
                   {rank === 1 && <Crown size={14} className={styles.crown} />}
                 </span>
               </td>
-              <td className={styles.statCell}>{row.wins}</td>
+              <td className={styles.statCell}>{row.gold}</td>
+              <td className={styles.statCell}>{row.silver}</td>
+              <td className={styles.statCell}>{row.bronze}</td>
               <td className={styles.statCell}>{row.gamesPlayed}</td>
-              <td className={styles.statCell}>{Math.round(row.winRate * 100)}%</td>
             </tr>
           );
         })}
         {viewerRow && (
           <>
             <tr className={styles.gapRow} aria-hidden="true">
-              <td className={styles.gapCell} colSpan={5}>
+              <td className={styles.gapCell} colSpan={6}>
                 ⋯
               </td>
             </tr>
@@ -78,9 +73,10 @@ export function LeaderboardTable({ rows, sortKey, onSort, me, viewerRow }: Leade
               <td className={styles.nameCell}>
                 <span className={styles.nameWrap}>{viewerRow.row.displayName}</span>
               </td>
-              <td className={styles.statCell}>{viewerRow.row.wins}</td>
+              <td className={styles.statCell}>{viewerRow.row.gold}</td>
+              <td className={styles.statCell}>{viewerRow.row.silver}</td>
+              <td className={styles.statCell}>{viewerRow.row.bronze}</td>
               <td className={styles.statCell}>{viewerRow.row.gamesPlayed}</td>
-              <td className={styles.statCell}>{Math.round(viewerRow.row.winRate * 100)}%</td>
             </tr>
           </>
         )}

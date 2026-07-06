@@ -13,19 +13,18 @@ export interface Game {
   hasVariants: boolean;
 }
 
-export interface OverallRow {
-  displayName: string;
-  wins: number;
-  gamesPlayed: number;
-  winRate: number;
-}
-
 export type Medal = "gold" | "silver" | "bronze";
 
 export interface MedalCounts {
   gold: number;
   silver: number;
   bronze: number;
+}
+
+export interface OverallRow extends MedalCounts {
+  displayName: string;
+  gamesPlayed: number;
+  gamesLed: string[];
 }
 
 export interface MedalBoardRow extends MedalCounts {

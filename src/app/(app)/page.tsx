@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { getMe, getLeaderboard } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
 import { useBoard } from "@/components/BoardContext";
-import { sortPlayers } from "@/lib/leaderboardSort";
-import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
+import { sortByMedals } from "@/lib/leaderboardSort";
 import { Card } from "@/components/Card";
 import { Tile } from "@/components/Tile";
 import { StreakBadge } from "@/components/StreakBadge";
@@ -30,7 +29,6 @@ export default function Home(): JSX.Element {
   const router = useRouter();
   const { boardId } = useBoard();
   const [state, setState] = useState<LoadState>({ status: "loading" });
-  const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
 
   const load = useCallback(() => {
     setState({ status: "loading" });
@@ -87,8 +85,6 @@ export default function Home(): JSX.Element {
         <HomeReady
           me={state.me}
           rows={state.rows}
-          sortKey={sortKey}
-          onSort={setSortKey}
           onLog={goToLog}
           isGroup={boardId !== null}
         />
@@ -100,13 +96,11 @@ export default function Home(): JSX.Element {
 interface HomeReadyProps {
   me: MeResponse;
   rows: OverallRow[];
-  sortKey: LeaderboardSortKey;
-  onSort: (key: LeaderboardSortKey) => void;
   onLog: () => void;
   isGroup: boolean;
 }
 
-function HomeReady({ me, rows, sortKey, onSort, onLog, isGroup }: HomeReadyProps): JSX.Element {
+function HomeReady({ me, rows, onLog, isGroup }: HomeReadyProps): JSX.Element {
   // totalCount reflects how many games the board tracks (group-tracked-active
   // games for a group; the catalog for the global board) — not whether the
   // viewer has logged anything. Only an empty catalog/tracking list is a true
@@ -134,7 +128,7 @@ function HomeReady({ me, rows, sortKey, onSort, onLog, isGroup }: HomeReadyProps
   const name = me.displayName;
   // Show the top N, and if the viewer is outside the top N, show their row below
   // a gap with their TRUE rank so they can always see where they stand.
-  const sorted = sortPlayers(rows, sortKey);
+  const sorted = sortByMedals(rows);
   const snapshot = sorted.slice(0, SNAPSHOT_SIZE);
   const viewerIdx = name ? sorted.findIndex((r) => r.displayName === name) : -1;
   const viewerRow =
@@ -165,7 +159,7 @@ function HomeReady({ me, rows, sortKey, onSort, onLog, isGroup }: HomeReadyProps
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>This week</h2>
         <Card>
-          <LeaderboardTable rows={snapshot} sortKey={sortKey} onSort={onSort} me={name ?? undefined} viewerRow={viewerRow} />
+          <LeaderboardTable rows={snapshot} me={name ?? undefined} viewerRow={viewerRow} />
         </Card>
       </section>
     </>

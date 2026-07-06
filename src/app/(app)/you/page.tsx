@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
+import { sortByMedals } from "@/lib/leaderboardSort";
 import { saveName } from "@/lib/rememberMe";
 import { toDayNumber } from "@/lib/day";
 import { formatResult } from "@/lib/formatResult";
@@ -25,7 +26,7 @@ function bestLongestStreak(me: MeResponse): number {
 
 function rankOf(rows: OverallRow[], name: string | null): number | null {
   if (!name) return null;
-  const sorted = [...rows].sort((a, b) => b.wins - a.wins);
+  const sorted = sortByMedals(rows);
   const index = sorted.findIndex((r) => r.displayName === name);
   return index === -1 ? null : index + 1;
 }
@@ -129,8 +130,10 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
 
   const myRow = rows.find((r) => r.displayName === name);
   const rank = rankOf(rows, name);
-  const wins = myRow?.wins ?? 0;
-  const winRate = myRow?.winRate ?? 0;
+  // TODO(Task 17): this is a compile-safe stopgap for the medal-tally
+  // `OverallRow` shape — Task 17 owns the real Overall stat presentation.
+  const gold = myRow?.gold ?? 0;
+  const gamesPlayed = myRow?.gamesPlayed ?? 0;
   const bestStreak = bestLongestStreak(me);
   const initial = name.trim().charAt(0).toUpperCase();
 
@@ -211,9 +214,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
       )}
 
       <div className={styles.statRow}>
-        <StatCard value={wins} label="Wins" />
+        <StatCard value={gold} label="Gold" />
         <StatCard value={bestStreak} label="Best streak" />
-        <StatCard value={`${Math.round(winRate * 100)}%`} label="Win rate" />
+        <StatCard value={gamesPlayed} label="Played" />
       </div>
 
       <section className={styles.section}>

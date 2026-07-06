@@ -43,9 +43,9 @@ const meResponse: MeResponse = {
 };
 
 const leaderboardRows: OverallRow[] = [
-  { displayName: "DJ", wins: 18, gamesPlayed: 20, winRate: 0.9 },
-  { displayName: "You", wins: 16, gamesPlayed: 19, winRate: 0.84 },
-  { displayName: "Devanshi", wins: 14, gamesPlayed: 18, winRate: 0.78 },
+  { displayName: "DJ", gold: 18, silver: 0, bronze: 0, gamesPlayed: 20, gamesLed: [] },
+  { displayName: "You", gold: 16, silver: 0, bronze: 0, gamesPlayed: 19, gamesLed: [] },
+  { displayName: "Devanshi", gold: 14, silver: 0, bronze: 0, gamesPlayed: 18, gamesLed: [] },
 ];
 
 beforeEach(() => {
@@ -93,11 +93,11 @@ describe("You", () => {
 
     // Initial "Y" for "You" shown in the avatar
     expect(container.textContent).toMatch(/Y/);
-    // Rank: "You" is 2nd by wins (18, 16, 14)
+    // Rank: "You" is 2nd by gold (18, 16, 14)
     expect(container.textContent).toMatch(/#2/);
   });
 
-  it("renders the three StatCards: wins, best streak, win rate", async () => {
+  it("renders the three StatCards: gold, best streak, played", async () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
@@ -106,9 +106,9 @@ describe("You", () => {
 
     render(<You />);
 
-    await waitFor(() => expect(screen.getByText("16")).toBeTruthy()); // wins
+    await waitFor(() => expect(screen.getByText("16")).toBeTruthy()); // gold
     expect(screen.getByText("12")).toBeTruthy(); // best streak = max longestStreak across streaks (12, 4, 2)
-    expect(screen.getByText("84%")).toBeTruthy(); // win rate
+    expect(screen.getByText("19")).toBeTruthy(); // gamesPlayed
   });
 
   it("renders a per-game streak list from me.streaks with StreakBadge", async () => {
@@ -208,7 +208,7 @@ describe("You", () => {
       render(<You />);
 
       await waitFor(() => expect(screen.getAllByText("Devanshi").length).toBeGreaterThan(0));
-      // Rank: "Devanshi" is 3rd by wins (18, 16, 14)
+      // Rank: "Devanshi" is 3rd by gold (18, 16, 14)
       expect(screen.getByText(/#3/)).toBeTruthy();
     });
   });
