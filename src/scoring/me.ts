@@ -1,4 +1,5 @@
 import { computeGameBoard, type DatedGameEntry } from "@/scoring/gameBoard";
+import type { ResultDetail } from "@/parsers/types";
 
 export interface MeEntry {
   gameId: string;
@@ -7,6 +8,7 @@ export interface MeEntry {
   value: number;
   solved: boolean;
   direction: "lower_better" | "higher_better";
+  detail?: ResultDetail | null;
 }
 
 export interface MeGame {
@@ -40,6 +42,7 @@ export interface MeResult {
     value: number;
     solved: boolean;
     puzzleDate: string;
+    detail: ResultDetail | null;
   }[];
 }
 
@@ -96,6 +99,7 @@ export function computeMe(input: MeInput): MeResult {
       value: e.value,
       solved: e.solved,
       puzzleDate: e.puzzleDate,
+      detail: e.detail ?? null,
     }));
 
   return {

@@ -2,6 +2,9 @@
 // Wraps fetch calls to the existing backend routes and normalizes results into
 // a discriminated union so callers never need to touch raw Response objects.
 
+import type { ResultDetail } from "@/parsers/types";
+export type { ResultDetail } from "@/parsers/types";
+
 export interface Game {
   id: string;
   name: string;
@@ -46,6 +49,7 @@ export interface MeResponse {
     value: number;
     solved: boolean;
     puzzleDate: string;
+    detail: ResultDetail | null;
   }[];
   displayName: string | null;
 }

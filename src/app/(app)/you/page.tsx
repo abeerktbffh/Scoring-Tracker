@@ -4,6 +4,7 @@ import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
 import { saveName } from "@/lib/rememberMe";
 import { toDayNumber } from "@/lib/day";
+import { formatResult } from "@/lib/formatResult";
 import { Card } from "@/components/Card";
 import { StatCard } from "@/components/StatCard";
 import { StreakBadge } from "@/components/StreakBadge";
@@ -242,7 +243,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
                     {r.name}
                     {r.variant ? ` ${r.variant}` : ""}
                   </span>
-                  <span className={styles.recentValue}>{r.value}</span>
+                  <span className={styles.recentValue}>
+                    {formatResult(r.gameId, r.value, r.solved, r.detail)}
+                  </span>
                   <span className={styles.recentDay}>{relativeDay(r.puzzleDate, me.today.date)}</span>
                 </li>
               ))}

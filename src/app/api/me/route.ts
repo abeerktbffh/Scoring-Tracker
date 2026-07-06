@@ -4,6 +4,7 @@ import { requireUser, requireMember } from "@/lib/membership";
 import { PLATFORM_TZ } from "@/lib/group";
 import { computeMe } from "@/scoring/me";
 import { localDateInTz } from "@/lib/day";
+import type { ResultDetail } from "@/parsers/types";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
   const entryRows = (groupId
     ? await sql`
         SELECT e.game_id, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
-               g.metric_direction
+               g.metric_direction, e.detail
         FROM entries e
         JOIN games g ON g.id = e.game_id
         WHERE e.user_id = ${viewerUserId} AND e.superseded_by IS NULL AND e.is_late = false
@@ -60,7 +61,7 @@ export async function GET(req: Request) {
       `
     : await sql`
         SELECT e.game_id, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
-               g.metric_direction
+               g.metric_direction, e.detail
         FROM entries e
         JOIN games g ON g.id = e.game_id
         WHERE e.user_id = ${viewerUserId} AND e.superseded_by IS NULL AND e.is_late = false
@@ -71,6 +72,7 @@ export async function GET(req: Request) {
     parsed_value: number;
     solved: boolean;
     metric_direction: "lower_better" | "higher_better";
+    detail: ResultDetail | null;
   }[];
 
   const games = gameRows.map((g) => ({ id: g.id, name: g.name }));
@@ -81,6 +83,7 @@ export async function GET(req: Request) {
     value: e.parsed_value,
     solved: e.solved,
     direction: e.metric_direction,
+    detail: e.detail ?? null,
   }));
 
   const result = computeMe({ today, games, entries });

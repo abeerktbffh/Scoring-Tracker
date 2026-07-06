@@ -35,9 +35,9 @@ const meResponse: MeResponse = {
     { gameId: "connections", name: "Connections", currentStreak: 0, longestStreak: 2 },
   ],
   recent: [
-    { gameId: "wordle", name: "Wordle", variant: null, value: 3, solved: true, puzzleDate: today },
-    { gameId: "pips", name: "Pips", variant: "Hard", value: 72, solved: true, puzzleDate: today },
-    { gameId: "mini", name: "Mini", variant: null, value: 48, solved: true, puzzleDate: yesterday },
+    { gameId: "wordle", name: "Wordle", variant: null, value: 3, solved: true, puzzleDate: today, detail: null },
+    { gameId: "pips", name: "Pips", variant: "Hard", value: 72, solved: true, puzzleDate: today, detail: null },
+    { gameId: "nyt-mini", name: "Mini", variant: null, value: 48, solved: true, puzzleDate: yesterday, detail: null },
   ],
   displayName: "You",
 };
@@ -145,6 +145,8 @@ describe("You", () => {
 
     await waitFor(() => expect(screen.getAllByText(/today/i).length).toBeGreaterThan(0));
     expect(screen.getByText(/yesterday/i)).toBeTruthy();
+    expect(screen.getByText("3/6 ✓")).toBeTruthy();
+    expect(screen.getByText("1:12")).toBeTruthy();
   });
 
   it("shows EmptyState for recent history when me.recent is empty", async () => {
