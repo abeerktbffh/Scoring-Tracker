@@ -99,12 +99,13 @@ Aggregate-window rows and games without detail don't expand.
 | **Hints** (fewer) | Strands | `No hints` / `N hints` | hints, **theme**, **grid** |
 | | Minute Cryptic | `N hints` | hints, **N under community par** |
 
-## Suggested phased rollout (for the plan)
+## Rollout — one coordinated build (owner decision)
 
-Big change; split so each phase ships a working improvement:
-- **Phase A — "proper numbers":** add `detail` column + extend parsers to populate it + backfill re-parse; add `formatResult`; render proper units + solved/failed everywhere values show (boards, Home, You). No scoring/nav change yet. Immediate clarity win, low risk.
-- **Phase B — medals & nav:** daily-win → medals/placements + medal-tally aggregate boards + Overall as medal tally; the one-row Game/Window dropdown nav; played-as-context. Behavior change to the standings.
-- **Phase C — process:** today-only inline collapsible with stat pills + grids.
+Ships as **a single build** (one branch → one PR → one deploy), NOT three separate releases. The implementation plan still **orders the work internally** because each layer builds on the previous, but there is no intermediate release:
+1. **Data + formatting:** add the `detail` column, extend parsers to populate it, backfill re-parse existing `raw_input`, add `formatResult`, and render proper units + solved/failed everywhere values show (boards, Home, You).
+2. **Medals & nav:** daily-win → medals/placements, medal-tally aggregate boards, Overall as a medal tally, the one-row Game/Window dropdown nav, played-as-context.
+3. **Process:** the today-only inline collapsible with stat pills + grids.
+The whole thing goes through the standard gated deploy (backup → migrate the `detail` column + run the backfill → merge), same discipline as prior releases; nothing to prod without the owner's explicit go-ahead.
 
 ## Out of scope
 
