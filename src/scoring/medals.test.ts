@@ -67,4 +67,29 @@ describe("tallyMedals", () => {
       { playerId: "b", gold: 1, silver: 1, bronze: 0 },
     ]);
   });
+
+  it("gives no medals when all entries in a group are unsolved", () => {
+    const entries: GameEntry[] = [
+      { ...base, playerId: "a", value: 2, solved: false },
+      { ...base, playerId: "b", value: 3, solved: false },
+      { ...base, playerId: "c", value: 4, solved: false },
+    ];
+    expect(tallyMedals(entries)).toEqual([
+      { playerId: "a", gold: 0, silver: 0, bronze: 0 },
+      { playerId: "b", gold: 0, silver: 0, bronze: 0 },
+      { playerId: "c", gold: 0, silver: 0, bronze: 0 },
+    ]);
+  });
+
+  it("awards single gold to the sole solved entry in a group", () => {
+    const entries: GameEntry[] = [
+      { ...base, playerId: "a", value: 5, solved: true },
+      { ...base, playerId: "b", value: 3, solved: false },
+      { ...base, playerId: "c", value: 7, solved: false },
+    ];
+    const byId = Object.fromEntries(tallyMedals(entries).map((m) => [m.playerId, m]));
+    expect(byId.a).toEqual({ playerId: "a", gold: 1, silver: 0, bronze: 0 });
+    expect(byId.b).toEqual({ playerId: "b", gold: 0, silver: 0, bronze: 0 });
+    expect(byId.c).toEqual({ playerId: "c", gold: 0, silver: 0, bronze: 0 });
+  });
 });
