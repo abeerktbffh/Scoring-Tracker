@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tallyMedals, computeMedalBoard, type GameEntryLike } from "./medals";
+import { tallyMedals, computeMedalBoard, computeOverallMedals, type GameEntryLike } from "./medals";
 import type { GameEntry } from "./wins";
 import type { DatedGameEntry } from "./gameBoard";
 
@@ -119,5 +119,19 @@ describe("computeMedalBoard", () => {
   it("drops players with no in-window entries but PB stays all-time", () => {
     const entries: DatedGameEntry[] = [dg("a", "2026-06-01", 5)];
     expect(computeMedalBoard(entries, "2026-07-01")).toEqual([]);
+  });
+});
+
+describe("computeOverallMedals", () => {
+  it("sums medals across games, counts played, and lists games led", () => {
+    const entries: GameEntry[] = [
+      { gameId: "wordle", variant: null, puzzleKey: "wordle|1", direction: "lower_better", playerId: "a", value: 2, solved: true },
+      { gameId: "wordle", variant: null, puzzleKey: "wordle|1", direction: "lower_better", playerId: "b", value: 3, solved: true },
+      { gameId: "mini", variant: null, puzzleKey: "mini|1", direction: "lower_better", playerId: "b", value: 40, solved: true },
+      { gameId: "mini", variant: null, puzzleKey: "mini|1", direction: "lower_better", playerId: "a", value: 55, solved: true },
+    ];
+    const byId = Object.fromEntries(computeOverallMedals(entries).map((r) => [r.playerId, r]));
+    expect(byId.a).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, gamesLed: ["wordle"] });
+    expect(byId.b).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, gamesLed: ["mini"] });
   });
 });

@@ -121,3 +121,64 @@ export function computeMedalBoard(entries: DatedGameEntry[], start: string | nul
       a.playerId.localeCompare(b.playerId),
   );
 }
+
+export interface OverallMedalStat extends MedalCounts {
+  playerId: string;
+  gamesPlayed: number;
+  gamesLed: string[];
+}
+
+/**
+ * Overall medal tally across ALL games. gamesLed = the games where this player
+ * has the most golds (>0). PURE.
+ */
+export function computeOverallMedals(entries: GameEntry[]): OverallMedalStat[] {
+  const totals = new Map(tallyMedals(entries).map((m) => [m.playerId, m]));
+
+  const played = new Map<string, number>();
+  for (const e of entries) played.set(e.playerId, (played.get(e.playerId) ?? 0) + 1);
+
+  // Gold leaders per game.
+  const byGame = new Map<string, GameEntry[]>();
+  for (const e of entries) {
+    let g = byGame.get(e.gameId);
+    if (!g) {
+      g = [];
+      byGame.set(e.gameId, g);
+    }
+    g.push(e);
+  }
+  const gamesLed = new Map<string, string[]>();
+  for (const [gameId, gameEntries] of byGame.entries()) {
+    const golds = tallyMedals(gameEntries);
+    const maxGold = golds.reduce((mx, m) => Math.max(mx, m.gold), 0);
+    if (maxGold === 0) continue;
+    for (const m of golds) {
+      if (m.gold === maxGold) {
+        const list = gamesLed.get(m.playerId) ?? [];
+        list.push(gameId);
+        gamesLed.set(m.playerId, list);
+      }
+    }
+  }
+
+  const rows: OverallMedalStat[] = [...played.entries()].map(([playerId, gamesPlayed]) => {
+    const m = totals.get(playerId) ?? { gold: 0, silver: 0, bronze: 0 };
+    return {
+      playerId,
+      gold: m.gold,
+      silver: m.silver,
+      bronze: m.bronze,
+      gamesPlayed,
+      gamesLed: (gamesLed.get(playerId) ?? []).sort(),
+    };
+  });
+
+  return rows.sort(
+    (a, b) =>
+      b.gold - a.gold ||
+      b.silver - a.silver ||
+      b.bronze - a.bronze ||
+      a.playerId.localeCompare(b.playerId),
+  );
+}
