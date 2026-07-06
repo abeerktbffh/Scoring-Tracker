@@ -20,13 +20,28 @@ export interface OverallRow {
   winRate: number;
 }
 
-export interface GameBoardRow {
+export type Medal = "gold" | "silver" | "bronze";
+
+export interface MedalCounts {
+  gold: number;
+  silver: number;
+  bronze: number;
+}
+
+export interface MedalBoardRow extends MedalCounts {
   displayName: string;
-  wins: number;
   gamesPlayed: number;
-  bestValue: number;
-  currentStreak: number;
-  longestStreak: number;
+  pb: number | null;
+  pbFormatted: string | null;
+}
+
+export interface DailyContestRow {
+  displayName: string;
+  value: number;
+  valueFormatted: string;
+  solved: boolean;
+  medal: Medal | null;
+  detail: ResultDetail | null;
 }
 
 export interface Player {
@@ -153,7 +168,14 @@ export function getBoard(
   player?: string,
   group?: string
 ): Promise<
-  ApiResult<{ gameId: string; window: string; locked: boolean; players: GameBoardRow[]; viewerName: string | null }>
+  ApiResult<{
+    gameId: string;
+    window: string;
+    mode: "daily" | "aggregate";
+    locked: boolean;
+    players: DailyContestRow[] | MedalBoardRow[];
+    viewerName: string | null;
+  }>
 > {
   const params = new URLSearchParams();
   if (window !== undefined) params.set("window", window);
