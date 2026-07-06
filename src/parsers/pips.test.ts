@@ -13,6 +13,7 @@ describe("pips parser", () => {
       variant: "hard",
       value: 593,
       solved: true,
+      detail: { seconds: 593, difficulty: "hard" },
     });
   });
   it("parses an Easy result", () => {
@@ -22,6 +23,7 @@ describe("pips parser", () => {
       variant: "easy",
       value: 80,
       solved: true,
+      detail: { seconds: 80, difficulty: "easy" },
     });
   });
   it("throws on non-Pips text", () => {
@@ -34,9 +36,16 @@ describe("pips parser", () => {
       variant: "medium",
       value: 125,
       solved: true,
+      detail: { seconds: 125, difficulty: "medium" },
     });
   });
   it("throws when the time line is missing", () => {
     expect(() => pipsParser.parse("Pips #317 Hard 🔴")).toThrow();
+  });
+});
+
+describe("pips detail", () => {
+  it("captures seconds and difficulty", () => {
+    expect(pipsParser.parse("Pips #317 Hard 🔴\n9:53").detail).toEqual({ seconds: 593, difficulty: "hard" });
   });
 });

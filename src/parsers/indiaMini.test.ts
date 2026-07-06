@@ -17,6 +17,7 @@ describe("india mini parser", () => {
       variant: null,
       value: 320,
       solved: true,
+      detail: { seconds: 320 },
     });
   });
 
@@ -34,5 +35,11 @@ describe("india mini parser", () => {
 
   it("throws on non-India-Mini text", () => {
     expect(() => indiaMiniParser.parse("solved in 3 minutes somewhere else")).toThrow();
+  });
+});
+
+describe("india mini detail", () => {
+  it("captures seconds", () => {
+    expect(indiaMiniParser.parse(SAMPLE).detail).toEqual({ seconds: 320 });
   });
 });

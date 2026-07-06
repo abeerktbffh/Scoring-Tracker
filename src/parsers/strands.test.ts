@@ -19,6 +19,11 @@ describe("strands parser", () => {
       variant: null,
       value: 0,
       solved: true,
+      detail: {
+        hints: 0,
+        theme: "Added flavor",
+        grid: ["🔵🔵🔵🔵", "🔵🟡"],
+      },
     });
   });
 
@@ -32,5 +37,16 @@ describe("strands parser", () => {
 
   it("throws on non-Strands text", () => {
     expect(() => strandsParser.parse("hello")).toThrow();
+  });
+});
+
+describe("strands detail", () => {
+  it("captures hints, theme, and the verbatim grid", () => {
+    expect(strandsParser.parse(SAMPLE).detail).toEqual({
+      hints: 0,
+      theme: "Added flavor",
+      grid: ["🔵🔵🔵🔵", "🔵🟡"],
+    });
+    expect(strandsParser.parse(SAMPLE).value).toBe(0);
   });
 });

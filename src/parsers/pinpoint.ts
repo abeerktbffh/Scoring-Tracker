@@ -15,12 +15,15 @@ export const pinpointParser: Parser = {
     if (!h) throw new Error("Not a Pinpoint result");
     const g = text.match(GUESSES);
     if (!g) throw new Error("No guess count in Pinpoint result");
+    const trail = [...text.matchAll(/(\d+)%\s*match/gi)].map((m) => Number(m[1]));
+    const solved = /📌/u.test(text) || /100%/.test(text);
     return {
       gameId: "pinpoint",
       puzzleNumber: Number(h[1]),
       variant: null,
       value: Number(g[1]),
-      solved: /📌/u.test(text) || /100%/.test(text),
+      solved,
+      detail: { guesses: Number(g[1]), solved, trail },
     };
   },
 };

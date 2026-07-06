@@ -21,6 +21,7 @@ export const pipsParser: Parser = {
       variant: h[2].toLowerCase(),
       value,
       solved: true,
+      detail: { seconds: value, difficulty: h[2].toLowerCase() },
     };
   },
 };
