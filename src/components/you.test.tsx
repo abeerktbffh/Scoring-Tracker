@@ -43,9 +43,9 @@ const meResponse: MeResponse = {
 };
 
 const leaderboardRows: OverallRow[] = [
-  { displayName: "DJ", gold: 18, silver: 0, bronze: 0, gamesPlayed: 20, gamesLed: [] },
-  { displayName: "You", gold: 16, silver: 0, bronze: 0, gamesPlayed: 19, gamesLed: [] },
-  { displayName: "Devanshi", gold: 14, silver: 0, bronze: 0, gamesPlayed: 18, gamesLed: [] },
+  { displayName: "DJ", gold: 18, silver: 2, bronze: 1, gamesPlayed: 20, gamesLed: [] },
+  { displayName: "You", gold: 16, silver: 1, bronze: 0, gamesPlayed: 19, gamesLed: [] },
+  { displayName: "Devanshi", gold: 14, silver: 3, bronze: 2, gamesPlayed: 18, gamesLed: [] },
 ];
 
 beforeEach(() => {
@@ -97,7 +97,7 @@ describe("You", () => {
     expect(container.textContent).toMatch(/#2/);
   });
 
-  it("renders the three StatCards: gold, best streak, played", async () => {
+  it("renders the three StatCards: golds, best streak, other medals", async () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
@@ -106,9 +106,11 @@ describe("You", () => {
 
     render(<You />);
 
-    await waitFor(() => expect(screen.getByText("16")).toBeTruthy()); // gold
+    await waitFor(() => expect(screen.getByText("16")).toBeTruthy()); // golds
+    expect(screen.getByText("Golds")).toBeTruthy();
     expect(screen.getByText("12")).toBeTruthy(); // best streak = max longestStreak across streaks (12, 4, 2)
-    expect(screen.getByText("19")).toBeTruthy(); // gamesPlayed
+    expect(screen.getByText("🥈1 🥉0")).toBeTruthy(); // other medals
+    expect(screen.getByText("Other medals")).toBeTruthy();
   });
 
   it("renders a per-game streak list from me.streaks with StreakBadge", async () => {

@@ -130,10 +130,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
 
   const myRow = rows.find((r) => r.displayName === name);
   const rank = rankOf(rows, name);
-  // TODO(Task 17): this is a compile-safe stopgap for the medal-tally
-  // `OverallRow` shape — Task 17 owns the real Overall stat presentation.
-  const gold = myRow?.gold ?? 0;
-  const gamesPlayed = myRow?.gamesPlayed ?? 0;
+  const golds = myRow?.gold ?? 0;
+  const silvers = myRow?.silver ?? 0;
+  const bronzes = myRow?.bronze ?? 0;
   const bestStreak = bestLongestStreak(me);
   const initial = name.trim().charAt(0).toUpperCase();
 
@@ -214,9 +213,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
       )}
 
       <div className={styles.statRow}>
-        <StatCard value={gold} label="Gold" />
+        <StatCard value={golds} label="Golds" />
         <StatCard value={bestStreak} label="Best streak" />
-        <StatCard value={gamesPlayed} label="Played" />
+        <StatCard value={`🥈${silvers} 🥉${bronzes}`} label="Other medals" />
       </div>
 
       <section className={styles.section}>
