@@ -134,4 +134,56 @@ describe("computeOverallMedals", () => {
     expect(byId.a).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, gamesLed: ["wordle"] });
     expect(byId.b).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, gamesLed: ["mini"] });
   });
+
+  it("lists the same game in gamesLed for all players tied for max gold in that game", () => {
+    // Two players, two puzzle-days in same game, tied gold counts
+    const entries: GameEntry[] = [
+      // Day 1: x and y both value 10 (tied for gold)
+      { gameId: "game1", variant: null, puzzleKey: "game1|day1", direction: "lower_better", playerId: "x", value: 10, solved: true },
+      { gameId: "game1", variant: null, puzzleKey: "game1|day1", direction: "lower_better", playerId: "y", value: 10, solved: true },
+      // Day 2: x and y both value 20 (tied for gold)
+      { gameId: "game1", variant: null, puzzleKey: "game1|day2", direction: "lower_better", playerId: "x", value: 20, solved: true },
+      { gameId: "game1", variant: null, puzzleKey: "game1|day2", direction: "lower_better", playerId: "y", value: 20, solved: true },
+    ];
+    const result = computeOverallMedals(entries);
+    const byId = Object.fromEntries(result.map((r) => [r.playerId, r]));
+    expect(byId.x).toMatchObject({ gold: 2, silver: 0, bronze: 0, gamesPlayed: 2, gamesLed: ["game1"] });
+    expect(byId.y).toMatchObject({ gold: 2, silver: 0, bronze: 0, gamesPlayed: 2, gamesLed: ["game1"] });
+  });
+
+  it("skips games where no entry is solved (maxGold === 0) and does not throw", () => {
+    // Game with all unsolved entries, plus another game with solved entries
+    const entries: GameEntry[] = [
+      // game1: all unsolved (no one gets medals)
+      { gameId: "game1", variant: null, puzzleKey: "game1|1", direction: "lower_better", playerId: "a", value: 5, solved: false },
+      { gameId: "game1", variant: null, puzzleKey: "game1|1", direction: "lower_better", playerId: "b", value: 8, solved: false },
+      // game2: a solves it (gets gold)
+      { gameId: "game2", variant: null, puzzleKey: "game2|1", direction: "lower_better", playerId: "a", value: 10, solved: true },
+    ];
+    const result = computeOverallMedals(entries);
+    const byId = Object.fromEntries(result.map((r) => [r.playerId, r]));
+    // a: 2 entries (1 unsolved in game1, 1 solved in game2), led game2 only
+    // b: 1 entry (unsolved in game1), no games led
+    expect(byId.a).toMatchObject({ gold: 1, silver: 0, bronze: 0, gamesPlayed: 2, gamesLed: ["game2"] });
+    expect(byId.b).toMatchObject({ gold: 0, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: [] });
+  });
+
+  it("handles single-game player: all entries in one game, gamesPlayed matches entry count", () => {
+    // Player "solo" only in game1 with 3 entries; player "other" in both games
+    const entries: GameEntry[] = [
+      // game1: solo has 3 entries, other has 1
+      { gameId: "game1", variant: null, puzzleKey: "game1|1", direction: "lower_better", playerId: "solo", value: 5, solved: true },
+      { gameId: "game1", variant: null, puzzleKey: "game1|1", direction: "lower_better", playerId: "other", value: 10, solved: true },
+      { gameId: "game1", variant: null, puzzleKey: "game1|2", direction: "lower_better", playerId: "solo", value: 3, solved: true },
+      { gameId: "game1", variant: null, puzzleKey: "game1|3", direction: "lower_better", playerId: "solo", value: 7, solved: true },
+      // game2: other only
+      { gameId: "game2", variant: null, puzzleKey: "game2|1", direction: "lower_better", playerId: "other", value: 2, solved: true },
+    ];
+    const result = computeOverallMedals(entries);
+    const byId = Object.fromEntries(result.map((r) => [r.playerId, r]));
+    // solo: 3 entries all in game1, earns 3 golds (each puzzle-day solo is best)
+    expect(byId.solo).toMatchObject({ gold: 3, silver: 0, bronze: 0, gamesPlayed: 3, gamesLed: ["game1"] });
+    // other: 2 entries (1 in game1, 1 in game2), 1 silver from game1, 1 gold from game2
+    expect(byId.other).toMatchObject({ gold: 1, silver: 1, bronze: 0, gamesPlayed: 2, gamesLed: ["game2"] });
+  });
 });
