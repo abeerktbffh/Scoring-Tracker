@@ -122,6 +122,44 @@ export function computeMedalBoard(entries: DatedGameEntry[], start: string | nul
   );
 }
 
+export interface DailyContestStat {
+  playerId: string;
+  value: number;
+  solved: boolean;
+  medal: Medal | null;
+}
+
+/**
+ * Today's live contest for a single game/day. Solved entries ranked by
+ * direction; unsolved sink to the bottom (by playerId). Medal by distinct-value
+ * rank among solved (gold/silver/bronze; co-winners tie for gold). PURE.
+ */
+export function computeDailyContest(entries: GameEntry[]): DailyContestStat[] {
+  const solved = entries.filter((e) => e.solved);
+  const unsolved = entries.filter((e) => !e.solved);
+  const dir = entries[0]?.direction ?? "lower_better";
+  const distinct = [...new Set(solved.map((e) => e.value))].sort((a, b) =>
+    isBetter(a, b, dir) ? -1 : isBetter(b, a, dir) ? 1 : 0,
+  );
+
+  const solvedRows: DailyContestStat[] = solved
+    .slice()
+    .sort((a, b) => (isBetter(a.value, b.value, dir) ? -1 : isBetter(b.value, a.value, dir) ? 1 : a.playerId.localeCompare(b.playerId)))
+    .map((e) => ({
+      playerId: e.playerId,
+      value: e.value,
+      solved: true,
+      medal: MEDAL_BY_RANK[distinct.indexOf(e.value)] ?? null,
+    }));
+
+  const unsolvedRows: DailyContestStat[] = unsolved
+    .slice()
+    .sort((a, b) => a.playerId.localeCompare(b.playerId))
+    .map((e) => ({ playerId: e.playerId, value: e.value, solved: false, medal: null }));
+
+  return [...solvedRows, ...unsolvedRows];
+}
+
 export interface OverallMedalStat extends MedalCounts {
   playerId: string;
   gamesPlayed: number;

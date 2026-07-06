@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tallyMedals, computeMedalBoard, computeOverallMedals, type GameEntryLike } from "./medals";
+import { tallyMedals, computeMedalBoard, computeOverallMedals, computeDailyContest, type GameEntryLike } from "./medals";
 import type { GameEntry } from "./wins";
 import type { DatedGameEntry } from "./gameBoard";
 
@@ -185,5 +185,26 @@ describe("computeOverallMedals", () => {
     expect(byId.solo).toMatchObject({ gold: 3, silver: 0, bronze: 0, gamesPlayed: 3, gamesLed: ["game1"] });
     // other: 2 entries (1 in game1, 1 in game2), 1 silver from game1, 1 gold from game2
     expect(byId.other).toMatchObject({ gold: 1, silver: 1, bronze: 0, gamesPlayed: 2, gamesLed: ["game2"] });
+  });
+});
+
+describe("computeDailyContest", () => {
+  const e = (playerId: string, value: number, solved = true): GameEntry => ({
+    playerId, gameId: "wordle", variant: null, puzzleKey: "wordle|2026-07-06",
+    value, solved, direction: "lower_better",
+  });
+
+  it("ranks solved by direction, medals the top three distinct, unsolved last", () => {
+    const rows = computeDailyContest([e("a", 4), e("b", 2), e("c", 3), e("d", 9, false)]);
+    expect(rows.map((r) => r.playerId)).toEqual(["b", "c", "a", "d"]);
+    expect(rows.map((r) => r.medal)).toEqual(["gold", "silver", "bronze", null]);
+  });
+
+  it("co-winners tie for gold; the next distinct value is silver", () => {
+    const rows = computeDailyContest([e("a", 3), e("b", 3), e("c", 5)]);
+    const byId = Object.fromEntries(rows.map((r) => [r.playerId, r]));
+    expect(byId.a.medal).toBe("gold");
+    expect(byId.b.medal).toBe("gold");
+    expect(byId.c.medal).toBe("silver");
   });
 });
