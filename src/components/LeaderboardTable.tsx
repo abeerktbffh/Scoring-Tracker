@@ -14,15 +14,33 @@ export interface LeaderboardTableProps {
   viewerRow?: { row: OverallRow; rank: number };
 }
 
-// TODO(Task 17): this is a compile-safe stopgap for the medal-tally
-// `OverallRow` shape (gold/silver/bronze/gamesPlayed/gamesLed) — Task 17 owns
-// the real Overall board UI (columns, gamesLed display, styling).
-const COLUMNS: { key: "gold" | "silver" | "bronze" | "gamesPlayed"; label: string }[] = [
-  { key: "gold", label: "Gold" },
-  { key: "silver", label: "Silver" },
-  { key: "bronze", label: "Bronze" },
-  { key: "gamesPlayed", label: "Played" },
-];
+function MedalCell({ row }: { row: OverallRow }): JSX.Element {
+  return (
+    <span>
+      🥇{row.gold} 🥈{row.silver} 🥉{row.bronze}
+    </span>
+  );
+}
+
+function Row({ row, rank, me }: { row: OverallRow; rank: number; me?: string }): JSX.Element {
+  const isMe = row.displayName === me;
+  return (
+    <tr className={[styles.row, isMe ? styles.me : ""].filter(Boolean).join(" ")}>
+      <td className={styles.rankCell}>{rank}</td>
+      <td className={styles.nameCell}>
+        <span className={styles.nameWrap}>
+          {row.displayName}
+          {rank === 1 && <Crown size={14} className={styles.crown} />}
+        </span>
+        {row.gamesLed.length > 0 && <span className={styles.subLine}>Leads: {row.gamesLed.join(", ")}</span>}
+      </td>
+      <td className={styles.statCell}>
+        <MedalCell row={row} />
+      </td>
+      <td className={styles.statCell}>{row.gamesPlayed}</td>
+    </tr>
+  );
+}
 
 export function LeaderboardTable({ rows, me, viewerRow }: LeaderboardTableProps): JSX.Element {
   return (
@@ -31,53 +49,22 @@ export function LeaderboardTable({ rows, me, viewerRow }: LeaderboardTableProps)
         <tr className={styles.headerRow}>
           <th className={styles.headerCell} />
           <th className={styles.headerCell}>Player</th>
-          {COLUMNS.map((col) => (
-            <th key={col.key} className={styles.headerCell}>
-              {col.label}
-            </th>
-          ))}
+          <th className={styles.headerCell}>Medals</th>
+          <th className={styles.headerCell}>Played</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, index) => {
-          const rank = index + 1;
-          const isMe = row.displayName === me;
-          return (
-            <tr
-              key={row.displayName}
-              className={[styles.row, isMe ? styles.me : ""].filter(Boolean).join(" ")}
-            >
-              <td className={styles.rankCell}>{rank}</td>
-              <td className={styles.nameCell}>
-                <span className={styles.nameWrap}>
-                  {row.displayName}
-                  {rank === 1 && <Crown size={14} className={styles.crown} />}
-                </span>
-              </td>
-              <td className={styles.statCell}>{row.gold}</td>
-              <td className={styles.statCell}>{row.silver}</td>
-              <td className={styles.statCell}>{row.bronze}</td>
-              <td className={styles.statCell}>{row.gamesPlayed}</td>
-            </tr>
-          );
-        })}
+        {rows.map((row, index) => (
+          <Row key={row.displayName} row={row} rank={index + 1} me={me} />
+        ))}
         {viewerRow && (
           <>
             <tr className={styles.gapRow} aria-hidden="true">
-              <td className={styles.gapCell} colSpan={6}>
+              <td className={styles.gapCell} colSpan={4}>
                 ⋯
               </td>
             </tr>
-            <tr className={[styles.row, styles.me].join(" ")}>
-              <td className={styles.rankCell}>{viewerRow.rank}</td>
-              <td className={styles.nameCell}>
-                <span className={styles.nameWrap}>{viewerRow.row.displayName}</span>
-              </td>
-              <td className={styles.statCell}>{viewerRow.row.gold}</td>
-              <td className={styles.statCell}>{viewerRow.row.silver}</td>
-              <td className={styles.statCell}>{viewerRow.row.bronze}</td>
-              <td className={styles.statCell}>{viewerRow.row.gamesPlayed}</td>
-            </tr>
+            <Row row={viewerRow.row} rank={viewerRow.rank} me={me} />
           </>
         )}
       </tbody>
