@@ -1,5 +1,5 @@
 import { detectAndParse } from "@/parsers/registry";
-import type { ParseResult } from "@/parsers/types";
+import type { ParseResult, ResultDetail } from "@/parsers/types";
 
 export interface ResolvedSubmission {
   gameId: string;
@@ -8,6 +8,7 @@ export interface ResolvedSubmission {
   solved: boolean;
   puzzleNumber: number | null;
   rawInput: string | null;
+  detail?: ResultDetail | null;
 }
 
 export interface SubmissionError {
