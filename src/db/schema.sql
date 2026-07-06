@@ -105,3 +105,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS groups_invite_token_hash_uq ON groups (invite_
 -- (low-sensitivity join link, owner-approved) without needing to rotate it via reset
 ALTER TABLE groups ADD COLUMN IF NOT EXISTS invite_token TEXT;
 
+-- === Leaderboard redesign: structured per-result detail (display/analytics only) ===
+-- Nullable. Populated by parsers on write and by scripts/backfill-detail.mjs for
+-- existing rows. The ranking scalar parsed_value + solved are unchanged. Rows
+-- that fail to re-parse keep detail = NULL and fall back to scalar display.
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS detail JSONB;
+
