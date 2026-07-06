@@ -207,4 +207,34 @@ describe("computeDailyContest", () => {
     expect(byId.b.medal).toBe("gold");
     expect(byId.c.medal).toBe("silver");
   });
+
+  it("returns empty array for empty input", () => {
+    const rows = computeDailyContest([]);
+    expect(rows).toEqual([]);
+  });
+
+  it("ranks three distinct solved values and assigns correct medals (gold/silver/bronze)", () => {
+    const rows = computeDailyContest([e("a", 2), e("b", 3), e("c", 4)]);
+    expect(rows).toEqual([
+      { playerId: "a", value: 2, solved: true, medal: "gold" },
+      { playerId: "b", value: 3, solved: true, medal: "silver" },
+      { playerId: "c", value: 4, solved: true, medal: "bronze" },
+    ]);
+  });
+
+  it("returns all unsolved entries with no medals, ordered by playerId", () => {
+    const rows = computeDailyContest([e("c", 5, false), e("a", 3, false), e("b", 4, false)]);
+    expect(rows).toEqual([
+      { playerId: "a", value: 3, solved: false, medal: null },
+      { playerId: "b", value: 4, solved: false, medal: null },
+      { playerId: "c", value: 5, solved: false, medal: null },
+    ]);
+  });
+
+  it("single solved entry wins gold", () => {
+    const rows = computeDailyContest([e("x", 42)]);
+    expect(rows).toEqual([
+      { playerId: "x", value: 42, solved: true, medal: "gold" },
+    ]);
+  });
 });
