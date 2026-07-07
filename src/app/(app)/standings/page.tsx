@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getLeaderboard, getBoard, getGames } from "@/lib/api";
 import type { OverallRow, MedalBoardRow, DailyContestRow, Game } from "@/lib/api";
 import { useBoard } from "@/components/BoardContext";
@@ -101,6 +101,13 @@ export default function Standings(): JSX.Element {
   const handleRetryOverall = useCallback(() => loadOverall(windowKey), [loadOverall, windowKey]);
   const handleRetryBoard = useCallback(() => loadBoard(gameKey, windowKey), [loadBoard, gameKey, windowKey]);
 
+  // id -> name map for rendering real game names in the Overall board's
+  // "Leads" line (the games list is already fetched for the Game ▾ nav).
+  const gameNames = useMemo(
+    () => Object.fromEntries(games.map((g) => [g.id, g.name])),
+    [games]
+  );
+
   return (
     <div className={styles.wrap}>
       <h1 className={styles.pageTitle}>Board</h1>
@@ -133,7 +140,12 @@ export default function Standings(): JSX.Element {
               <EmptyState title="No standings yet" body="Once results are logged, the medal tally shows up here." />
             )}
             {overall.status === "ready" && !overall.locked && overall.rows.length > 0 && (
-              <LeaderboardTable rows={sortByMedals(overall.rows)} me={viewerName ?? undefined} />
+              <LeaderboardTable
+                rows={sortByMedals(overall.rows)}
+                me={viewerName ?? undefined}
+                leads="names"
+                gameNames={gameNames}
+              />
             )}
           </>
         ) : (

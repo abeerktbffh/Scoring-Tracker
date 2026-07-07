@@ -64,6 +64,18 @@
   text-align: right;
 }
 
+/* Medals/Played column separation on MedalBoardTable only (DailyContestTable
+   reuses boardHeaderCell/statCell but not these modifiers) — the Medals glyph
+   string is visually wide, so it needs a floor width, and Played needs left
+   breathing room so the two right-aligned headers/values don't run together. */
+.medalsCol {
+  min-width: 92px;
+}
+
+.playedCol {
+  padding-left: var(--space-4);
+}
+
 .boardRow {
   border-bottom: 1px solid var(--line);
 }

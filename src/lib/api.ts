@@ -30,8 +30,6 @@ export interface OverallRow extends MedalCounts {
 export interface MedalBoardRow extends MedalCounts {
   displayName: string;
   gamesPlayed: number;
-  pb: number | null;
-  pbFormatted: string | null;
 }
 
 export interface DailyContestRow {

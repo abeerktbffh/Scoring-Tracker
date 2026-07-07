@@ -78,12 +78,11 @@ export function tallyMedals(entries: GameEntry[]): MedalTally[] {
 export interface MedalBoardStat extends MedalCounts {
   playerId: string;
   gamesPlayed: number;
-  pb: number | null;
 }
 
 /**
  * Aggregate per-game board over a window: medals (window), gamesPlayed
- * (window), PB (best solved value ALL-TIME by direction). PURE.
+ * (window). PURE.
  */
 export function computeMedalBoard(entries: DatedGameEntry[], start: string | null): MedalBoardStat[] {
   const inWindow = (d: string) => start === null || d >= start;
@@ -104,13 +103,8 @@ export function computeMedalBoard(entries: DatedGameEntry[], start: string | nul
   for (const [playerId, all] of byPlayer.entries()) {
     const win = all.filter((e) => inWindow(e.puzzleDate));
     if (win.length === 0) continue;
-    let pb: number | null = null;
-    for (const e of all) {
-      if (!e.solved) continue;
-      if (pb === null || isBetter(e.value, pb, e.direction)) pb = e.value;
-    }
     const m = medals.get(playerId) ?? { gold: 0, silver: 0, bronze: 0 };
-    rows.push({ playerId, gold: m.gold, silver: m.silver, bronze: m.bronze, gamesPlayed: win.length, pb });
+    rows.push({ playerId, gold: m.gold, silver: m.silver, bronze: m.bronze, gamesPlayed: win.length });
   }
 
   return rows.sort(

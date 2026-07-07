@@ -14,13 +14,25 @@
 
 .headerCell {
   text-align: left;
-  padding: 0;
+  padding: 0 var(--space-2);
 }
 
 .headerCell:last-child,
 .headerCell:nth-child(3),
 .headerCell:nth-child(4) {
   text-align: right;
+}
+
+/* Medals glyph string (🥇N 🥈N 🥉N) is visually wide; give it a floor width so
+   it doesn't get squeezed flush against Played at phone widths. */
+.headerCell:nth-child(3) {
+  min-width: 92px;
+}
+
+/* Extra breathing room before Played so the two right-aligned headers don't
+   read as one word. */
+.headerCell:nth-child(4) {
+  padding-left: var(--space-4);
 }
 
 .sortButton {
@@ -81,9 +93,11 @@
 
 .subLine {
   display: block;
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  opacity: 0.72;
+  margin-top: var(--space-1);
 }
 
 .statCell {
@@ -92,6 +106,14 @@
   font-family: var(--font-ui);
   font-weight: 700;
   font-size: 13px;
+}
+
+.statCell:nth-child(3) {
+  min-width: 92px;
+}
+
+.statCell:nth-child(4) {
+  padding-left: var(--space-4);
 }
 
 .me .statCell {

@@ -14,9 +14,8 @@ export function MedalBoardTable({ rows, me }: MedalBoardTableProps): JSX.Element
         <tr className={styles.boardHeaderRow}>
           <th className={styles.boardHeaderCell} />
           <th className={styles.boardHeaderCell}>Player</th>
-          <th className={styles.boardHeaderCell}>Medals</th>
-          <th className={styles.boardHeaderCell}>PB</th>
-          <th className={styles.boardHeaderCell}>Played</th>
+          <th className={[styles.boardHeaderCell, styles.medalsCol].join(" ")}>Medals</th>
+          <th className={[styles.boardHeaderCell, styles.playedCol].join(" ")}>Played</th>
         </tr>
       </thead>
       <tbody>
@@ -27,11 +26,10 @@ export function MedalBoardTable({ rows, me }: MedalBoardTableProps): JSX.Element
           >
             <td className={styles.rankCell}>{index + 1}</td>
             <td className={styles.nameCell}>{row.displayName}</td>
-            <td className={styles.statCell}>
+            <td className={[styles.statCell, styles.medalsCol].join(" ")}>
               🥇{row.gold} 🥈{row.silver} 🥉{row.bronze}
             </td>
-            <td className={styles.statCell}>{row.pbFormatted ?? "—"}</td>
-            <td className={styles.statCell}>{row.gamesPlayed}</td>
+            <td className={[styles.statCell, styles.playedCol].join(" ")}>{row.gamesPlayed}</td>
           </tr>
         ))}
       </tbody>

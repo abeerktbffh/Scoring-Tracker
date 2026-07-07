@@ -68,7 +68,7 @@ describe("DailyContestTable expansion (today-only)", () => {
 
   it("never expands aggregate (Week/Month/All-time) rows — MedalBoardTable stays flat", () => {
     const aggRow: MedalBoardRow = {
-      displayName: "DJ", gold: 2, silver: 1, bronze: 0, gamesPlayed: 5, pb: 3, pbFormatted: "3/6 ✓",
+      displayName: "DJ", gold: 2, silver: 1, bronze: 0, gamesPlayed: 5,
     };
     render(<MedalBoardTable rows={[aggRow]} />);
     expect(screen.queryByRole("button")).toBeNull();

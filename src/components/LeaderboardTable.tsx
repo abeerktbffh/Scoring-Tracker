@@ -12,6 +12,13 @@ export interface LeaderboardTableProps {
    * the viewer's TRUE position, not derived from list index.
    */
   viewerRow?: { row: OverallRow; rank: number };
+  /**
+   * How to render the "Leads" sub-line: a short count (Home snapshot) or the
+   * full list of game names (Overall board). Callers set this explicitly.
+   */
+  leads: "count" | "names";
+  /** id -> name map, needed for the "names" treatment. */
+  gameNames?: Record<string, string>;
 }
 
 function MedalCell({ row }: { row: OverallRow }): JSX.Element {
@@ -22,7 +29,41 @@ function MedalCell({ row }: { row: OverallRow }): JSX.Element {
   );
 }
 
-function Row({ row, rank, me }: { row: OverallRow; rank: number; me?: string }): JSX.Element {
+function LeadsLine({
+  row,
+  leads,
+  gameNames,
+}: {
+  row: OverallRow;
+  leads: "count" | "names";
+  gameNames?: Record<string, string>;
+}): JSX.Element | null {
+  if (row.gamesLed.length === 0) return null;
+  if (leads === "count") {
+    const n = row.gamesLed.length;
+    return (
+      <span className={styles.subLine}>
+        Leads {n} game{n === 1 ? "" : "s"}
+      </span>
+    );
+  }
+  const names = row.gamesLed.map((id) => gameNames?.[id] ?? id);
+  return <span className={styles.subLine}>Leads · {names.join(", ")}</span>;
+}
+
+function Row({
+  row,
+  rank,
+  me,
+  leads,
+  gameNames,
+}: {
+  row: OverallRow;
+  rank: number;
+  me?: string;
+  leads: "count" | "names";
+  gameNames?: Record<string, string>;
+}): JSX.Element {
   const isMe = row.displayName === me;
   return (
     <tr className={[styles.row, isMe ? styles.me : ""].filter(Boolean).join(" ")}>
@@ -32,7 +73,7 @@ function Row({ row, rank, me }: { row: OverallRow; rank: number; me?: string }):
           {row.displayName}
           {rank === 1 && <Crown size={14} className={styles.crown} />}
         </span>
-        {row.gamesLed.length > 0 && <span className={styles.subLine}>Leads: {row.gamesLed.join(", ")}</span>}
+        <LeadsLine row={row} leads={leads} gameNames={gameNames} />
       </td>
       <td className={styles.statCell}>
         <MedalCell row={row} />
@@ -42,7 +83,7 @@ function Row({ row, rank, me }: { row: OverallRow; rank: number; me?: string }):
   );
 }
 
-export function LeaderboardTable({ rows, me, viewerRow }: LeaderboardTableProps): JSX.Element {
+export function LeaderboardTable({ rows, me, viewerRow, leads, gameNames }: LeaderboardTableProps): JSX.Element {
   return (
     <table className={styles.table}>
       <thead>
@@ -55,7 +96,7 @@ export function LeaderboardTable({ rows, me, viewerRow }: LeaderboardTableProps)
       </thead>
       <tbody>
         {rows.map((row, index) => (
-          <Row key={row.displayName} row={row} rank={index + 1} me={me} />
+          <Row key={row.displayName} row={row} rank={index + 1} me={me} leads={leads} gameNames={gameNames} />
         ))}
         {viewerRow && (
           <>
@@ -64,7 +105,7 @@ export function LeaderboardTable({ rows, me, viewerRow }: LeaderboardTableProps)
                 ⋯
               </td>
             </tr>
-            <Row row={viewerRow.row} rank={viewerRow.rank} me={me} />
+            <Row row={viewerRow.row} rank={viewerRow.rank} me={me} leads={leads} gameNames={gameNames} />
           </>
         )}
       </tbody>

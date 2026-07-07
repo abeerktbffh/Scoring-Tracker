@@ -395,15 +395,15 @@ describe("GET /api/games/[gameId]/board — aggregate windows (weekly/monthly/al
     expect(body.mode).toBe("aggregate");
     expect(body.locked).toBe(false);
     expect(body.players).toEqual([
-      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, pb: 4, pbFormatted: "0:04" },
-      { displayName: "Other Player", gold: 0, silver: 1, bronze: 0, gamesPlayed: 1, pb: 5, pbFormatted: "0:05" },
+      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1 },
+      { displayName: "Other Player", gold: 0, silver: 1, bronze: 0, gamesPlayed: 1 },
     ]);
   });
 
-  it("computes PB across the player's FULL history, not just the window", async () => {
+  it("gamesPlayed is window-scoped even when older out-of-window entries exist", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([
-      // In-window entry: this week's result (worse than the old PB).
+      // In-window entry: this week's result.
       {
         user_id: "u_session",
         display_name: "Session Player",
@@ -414,7 +414,7 @@ describe("GET /api/games/[gameId]/board — aggregate windows (weekly/monthly/al
         detail: null,
         metric_direction: "lower_better",
       },
-      // Out-of-window entry (400 days ago): a better (lower) all-time value.
+      // Out-of-window entry (400 days ago): must not count toward gamesPlayed.
       {
         user_id: "u_session",
         display_name: "Session Player",
@@ -433,11 +433,10 @@ describe("GET /api/games/[gameId]/board — aggregate windows (weekly/monthly/al
     });
     const body = await res.json();
     expect(body.mode).toBe("aggregate");
-    // gamesPlayed is window-scoped (only the in-window entry counts)...
+    // gamesPlayed is window-scoped: only the in-window entry counts.
     expect(body.players).toEqual([
-      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, pb: 2, pbFormatted: "0:02" },
+      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1 },
     ]);
-    // ...but pb reflects the all-time best (2), not the windowed one (10).
   });
 
   it("returns all-time (window=all) as an unwindowed medal tally", async () => {
@@ -463,7 +462,7 @@ describe("GET /api/games/[gameId]/board — aggregate windows (weekly/monthly/al
     expect(body.mode).toBe("aggregate");
     expect(body.locked).toBe(false);
     expect(body.players).toEqual([
-      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, pb: 3, pbFormatted: "0:03" },
+      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1 },
     ]);
   });
 });

@@ -101,22 +101,22 @@ describe("computeMedalBoard", () => {
     value, solved, direction: "lower_better", puzzleDate,
   });
 
-  it("ranks by medals over the window and reports played + all-time PB", () => {
+  it("ranks by medals over the window and reports gamesPlayed", () => {
     const entries: DatedGameEntry[] = [
       dg("a", "2026-07-05", 2), dg("b", "2026-07-05", 3),
       dg("a", "2026-07-06", 4), dg("b", "2026-07-06", 3),
-      dg("a", "2026-06-01", 1), // out of window; still counts toward PB (all-time)
+      dg("a", "2026-06-01", 1), // out of window; doesn't count toward gamesPlayed
     ];
     const board = computeMedalBoard(entries, "2026-07-05");
     // 07-05: a=2 gold, b=3 silver. 07-06: b=3 gold, a=4 silver.
     // Both end gold:1 silver:1 bronze:0 → tie broken by playerId → a before b.
     expect(board.map((r) => r.playerId)).toEqual(["a", "b"]);
     const byId = Object.fromEntries(board.map((r) => [r.playerId, r]));
-    expect(byId.b).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, pb: 3 });
-    expect(byId.a).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2, pb: 1 });
+    expect(byId.b).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2 });
+    expect(byId.a).toMatchObject({ gold: 1, silver: 1, gamesPlayed: 2 });
   });
 
-  it("drops players with no in-window entries but PB stays all-time", () => {
+  it("drops players with no in-window entries", () => {
     const entries: DatedGameEntry[] = [dg("a", "2026-06-01", 5)];
     expect(computeMedalBoard(entries, "2026-07-01")).toEqual([]);
   });
