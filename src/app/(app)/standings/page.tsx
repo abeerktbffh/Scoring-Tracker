@@ -154,7 +154,7 @@ export default function Standings(): JSX.Element {
               <EmptyState title="No results yet" body="Once this game has results, the board shows up here." />
             )}
             {board.status === "ready" && !board.locked && board.rows.length > 0 && board.mode === "daily" && (
-              <DailyContestTable rows={board.rows as DailyContestRow[]} me={viewerName ?? undefined} />
+              <DailyContestTable rows={board.rows as DailyContestRow[]} gameId={gameKey} me={viewerName ?? undefined} />
             )}
             {board.status === "ready" && !board.locked && board.rows.length > 0 && board.mode === "aggregate" && (
               <MedalBoardTable rows={board.rows as MedalBoardRow[]} me={viewerName ?? undefined} />
