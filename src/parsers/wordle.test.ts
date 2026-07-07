@@ -20,6 +20,12 @@ describe("wordle parser", () => {
       variant: null,
       value: 3,
       solved: true,
+      detail: {
+        guesses: 3,
+        solved: true,
+        hardMode: false,
+        grid: ["⬛🟨⬛⬛⬛"],
+      },
     });
   });
 
@@ -30,10 +36,36 @@ describe("wordle parser", () => {
       variant: null,
       value: 7,
       solved: false,
+      detail: {
+        guesses: null,
+        solved: false,
+        hardMode: false,
+        grid: [],
+      },
     });
   });
 
   it("throws on unparseable text", () => {
     expect(() => wordleParser.parse("hello world")).toThrow();
+  });
+});
+
+describe("wordle detail", () => {
+  it("captures guesses, solved, hardMode, and the verbatim grid", () => {
+    const text = "Wordle 1,234 3/6*\n\n⬛🟨⬛⬛⬛\n⬛🟩🟨⬛⬛\n🟩🟩🟩🟩🟩";
+    expect(wordleParser.parse(text).detail).toEqual({
+      guesses: 3,
+      solved: true,
+      hardMode: true,
+      grid: ["⬛🟨⬛⬛⬛", "⬛🟩🟨⬛⬛", "🟩🟩🟩🟩🟩"],
+    });
+  });
+  it("marks a failed Wordle solved:false, guesses:null, and never emits the sentinel 7 in detail", () => {
+    const d = wordleParser.parse("Wordle 900 X/6").detail;
+    expect(d).toEqual({ guesses: null, solved: false, hardMode: false, grid: [] });
+  });
+  it("keeps the ranking scalar unchanged", () => {
+    expect(wordleParser.parse("Wordle 1,234 3/6\n\n🟩🟩🟩🟩🟩").value).toBe(3);
+    expect(wordleParser.parse("Wordle 900 X/6").value).toBe(7);
   });
 });

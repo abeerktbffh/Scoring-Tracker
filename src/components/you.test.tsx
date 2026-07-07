@@ -35,17 +35,17 @@ const meResponse: MeResponse = {
     { gameId: "connections", name: "Connections", currentStreak: 0, longestStreak: 2 },
   ],
   recent: [
-    { gameId: "wordle", name: "Wordle", variant: null, value: 3, solved: true, puzzleDate: today },
-    { gameId: "pips", name: "Pips", variant: "Hard", value: 72, solved: true, puzzleDate: today },
-    { gameId: "mini", name: "Mini", variant: null, value: 48, solved: true, puzzleDate: yesterday },
+    { gameId: "wordle", name: "Wordle", variant: null, value: 3, solved: true, puzzleDate: today, detail: null },
+    { gameId: "pips", name: "Pips", variant: "Hard", value: 72, solved: true, puzzleDate: today, detail: null },
+    { gameId: "nyt-mini", name: "Mini", variant: null, value: 48, solved: true, puzzleDate: yesterday, detail: null },
   ],
   displayName: "You",
 };
 
 const leaderboardRows: OverallRow[] = [
-  { displayName: "DJ", wins: 18, gamesPlayed: 20, winRate: 0.9 },
-  { displayName: "You", wins: 16, gamesPlayed: 19, winRate: 0.84 },
-  { displayName: "Devanshi", wins: 14, gamesPlayed: 18, winRate: 0.78 },
+  { displayName: "DJ", gold: 18, silver: 2, bronze: 1, gamesPlayed: 20, gamesLed: [] },
+  { displayName: "You", gold: 16, silver: 1, bronze: 0, gamesPlayed: 19, gamesLed: [] },
+  { displayName: "Devanshi", gold: 14, silver: 3, bronze: 2, gamesPlayed: 18, gamesLed: [] },
 ];
 
 beforeEach(() => {
@@ -93,11 +93,11 @@ describe("You", () => {
 
     // Initial "Y" for "You" shown in the avatar
     expect(container.textContent).toMatch(/Y/);
-    // Rank: "You" is 2nd by wins (18, 16, 14)
+    // Rank: "You" is 2nd by gold (18, 16, 14)
     expect(container.textContent).toMatch(/#2/);
   });
 
-  it("renders the three StatCards: wins, best streak, win rate", async () => {
+  it("renders the three StatCards: golds, best streak, other medals", async () => {
     mockedGetMe.mockResolvedValue({ ok: true, data: meResponse });
     mockedGetLeaderboard.mockResolvedValue({
       ok: true,
@@ -106,9 +106,11 @@ describe("You", () => {
 
     render(<You />);
 
-    await waitFor(() => expect(screen.getByText("16")).toBeTruthy()); // wins
+    await waitFor(() => expect(screen.getByText("16")).toBeTruthy()); // golds
+    expect(screen.getByText("Golds")).toBeTruthy();
     expect(screen.getByText("12")).toBeTruthy(); // best streak = max longestStreak across streaks (12, 4, 2)
-    expect(screen.getByText("84%")).toBeTruthy(); // win rate
+    expect(screen.getByText("🥈1 🥉0")).toBeTruthy(); // other medals
+    expect(screen.getByText("Other medals")).toBeTruthy();
   });
 
   it("renders a per-game streak list from me.streaks with StreakBadge", async () => {
@@ -145,6 +147,8 @@ describe("You", () => {
 
     await waitFor(() => expect(screen.getAllByText(/today/i).length).toBeGreaterThan(0));
     expect(screen.getByText(/yesterday/i)).toBeTruthy();
+    expect(screen.getByText("3/6 ✓")).toBeTruthy();
+    expect(screen.getByText("1:12")).toBeTruthy();
   });
 
   it("shows EmptyState for recent history when me.recent is empty", async () => {
@@ -206,7 +210,7 @@ describe("You", () => {
       render(<You />);
 
       await waitFor(() => expect(screen.getAllByText("Devanshi").length).toBeGreaterThan(0));
-      // Rank: "Devanshi" is 3rd by wins (18, 16, 14)
+      // Rank: "Devanshi" is 3rd by gold (18, 16, 14)
       expect(screen.getByText(/#3/)).toBeTruthy();
     });
   });

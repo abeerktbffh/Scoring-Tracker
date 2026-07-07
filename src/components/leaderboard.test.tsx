@@ -11,9 +11,9 @@ afterEach(() => {
 });
 
 const rows: OverallRow[] = [
-  { displayName: "DJ", wins: 18, gamesPlayed: 20, winRate: 0.9 },
-  { displayName: "You", wins: 16, gamesPlayed: 19, winRate: 0.84 },
-  { displayName: "Devanshi", wins: 14, gamesPlayed: 18, winRate: 0.78 },
+  { displayName: "DJ", gold: 18, silver: 0, bronze: 0, gamesPlayed: 20, gamesLed: ["wordle"] },
+  { displayName: "You", gold: 16, silver: 1, bronze: 0, gamesPlayed: 19, gamesLed: [] },
+  { displayName: "Devanshi", gold: 14, silver: 0, bronze: 1, gamesPlayed: 18, gamesLed: [] },
 ];
 
 describe("Segmented", () => {
@@ -60,9 +60,7 @@ describe("Segmented", () => {
 
 describe("LeaderboardTable", () => {
   it("highlights the row matching me with the self-highlight class", () => {
-    const { container } = render(
-      <LeaderboardTable rows={rows} sortKey="wins" onSort={vi.fn()} me="You" />
-    );
+    const { container } = render(<LeaderboardTable rows={rows} me="You" />);
 
     const youRow = screen.getByText("You").closest("tr");
     expect(youRow).toBeTruthy();
@@ -74,7 +72,7 @@ describe("LeaderboardTable", () => {
   });
 
   it("shows the crown icon on the rank-1 row", () => {
-    render(<LeaderboardTable rows={rows} sortKey="wins" onSort={vi.fn()} me="You" />);
+    render(<LeaderboardTable rows={rows} me="You" />);
 
     const djRow = screen.getByText("DJ").closest("tr");
     expect(djRow?.querySelector("svg")).toBeTruthy();
@@ -83,28 +81,13 @@ describe("LeaderboardTable", () => {
     expect(devanshiRow?.querySelector("svg")).toBeNull();
   });
 
-  it("renders rank, wins, played, and rounded win% columns", () => {
-    render(<LeaderboardTable rows={rows} sortKey="wins" onSort={vi.fn()} me="You" />);
+  it("renders rank, gold, silver, bronze, and played columns", () => {
+    render(<LeaderboardTable rows={rows} me="You" />);
 
     const djRow = screen.getByText("DJ").closest("tr");
     expect(djRow?.textContent).toContain("1");
     expect(djRow?.textContent).toContain("18");
     expect(djRow?.textContent).toContain("20");
-    expect(djRow?.textContent).toContain("90%");
-  });
-
-  it("calls onSort with the right key when a column header is clicked", () => {
-    const onSort = vi.fn();
-    render(<LeaderboardTable rows={rows} sortKey="wins" onSort={onSort} me="You" />);
-
-    fireEvent.click(screen.getByText(/win%/i));
-    expect(onSort).toHaveBeenCalledWith("winRate");
-
-    fireEvent.click(screen.getByText(/^played$/i));
-    expect(onSort).toHaveBeenCalledWith("gamesPlayed");
-
-    fireEvent.click(screen.getByText(/^wins$/i));
-    expect(onSort).toHaveBeenCalledWith("wins");
   });
 });
 
@@ -114,10 +97,11 @@ describe("LeaderboardTable viewerRow", () => {
     render(
       <LeaderboardTable
         rows={top}
-        sortKey="wins"
-        onSort={() => {}}
         me="Yuhnvee"
-        viewerRow={{ row: { displayName: "Yuhnvee", wins: 2, gamesPlayed: 5, winRate: 0.4 }, rank: 10 }}
+        viewerRow={{
+          row: { displayName: "Yuhnvee", gold: 0, silver: 0, bronze: 2, gamesPlayed: 5, gamesLed: [] },
+          rank: 10,
+        }}
       />
     );
     // The viewer's name shows...

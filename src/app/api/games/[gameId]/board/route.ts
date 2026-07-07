@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { sql } from "@/db/client";
 import { requireUser, requireMember } from "@/lib/membership";
 import { PLATFORM_TZ } from "@/lib/group";
-import { computeGameBoard, type DatedGameEntry } from "@/scoring/gameBoard";
+import { type DatedGameEntry } from "@/scoring/gameBoard";
+import { computeDailyContest, computeMedalBoard, type Medal } from "@/scoring/medals";
 import { isDailyBoardLocked } from "@/scoring/noPeek";
 import { localDateInTz } from "@/lib/day";
 import { windowStart, type Window } from "@/lib/window";
+import { formatResult } from "@/lib/formatResult";
+import type { ResultDetail } from "@/parsers/types";
 
 export const runtime = "nodejs";
 
@@ -42,7 +45,7 @@ export async function GET(
   const rows = (groupId
     ? await sql`
         SELECT e.user_id, u.display_name, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
-               g.metric_direction
+               e.detail, g.metric_direction
         FROM entries e
         JOIN users u ON u.id = e.user_id
         JOIN games g ON g.id = e.game_id
@@ -59,7 +62,7 @@ export async function GET(
       `
     : await sql`
         SELECT e.user_id, u.display_name, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
-               g.metric_direction
+               e.detail, g.metric_direction
         FROM entries e
         JOIN users u ON u.id = e.user_id
         JOIN games g ON g.id = e.game_id
@@ -74,6 +77,7 @@ export async function GET(
     puzzle_date: string;
     parsed_value: number;
     solved: boolean;
+    detail: ResultDetail | null;
     metric_direction: "lower_better" | "higher_better";
   }[];
 
@@ -93,11 +97,42 @@ export async function GET(
   const playedToday = playedRows.length > 0;
   const viewerName = guard.viewer.displayName ?? null;
   if (isDailyBoardLocked(window, playedToday)) {
-    return NextResponse.json({ gameId, window, locked: true, players: [], viewerName });
+    return NextResponse.json({ gameId, window, mode: "daily", locked: true, players: [], viewerName });
   }
 
   const names = new Map(rows.map((r) => [r.user_id, r.display_name]));
-  const entries: DatedGameEntry[] = rows.map((r) => ({
+  const detailById = new Map(
+    rows.map((r) => [`${r.user_id}|${r.puzzle_date}|${r.variant ?? ""}`, r.detail ?? null]),
+  );
+
+  if (window === "daily") {
+    // Live contest: today's single puzzle for this game.
+    const todays = rows.filter((r) => r.puzzle_date === today);
+    const contestEntries = todays.map((r) => ({
+      playerId: r.user_id,
+      gameId,
+      variant: r.variant,
+      puzzleKey: `${gameId}|${r.puzzle_date}`,
+      value: r.parsed_value,
+      solved: r.solved,
+      direction: r.metric_direction,
+    }));
+    const players = computeDailyContest(contestEntries).map((s) => {
+      const detail = detailById.get(`${s.playerId}|${today}|${s.variant ?? ""}`) ?? null;
+      return {
+        displayName: names.get(s.playerId) ?? s.playerId,
+        value: s.value,
+        valueFormatted: formatResult(gameId, s.value, s.solved, detail),
+        solved: s.solved,
+        medal: s.medal as Medal | null,
+        detail,
+        variant: s.variant,
+      };
+    });
+    return NextResponse.json({ gameId, window, mode: "daily", locked: false, players, viewerName });
+  }
+
+  const datedEntries: DatedGameEntry[] = rows.map((r) => ({
     playerId: r.user_id,
     gameId,
     variant: r.variant,
@@ -107,14 +142,14 @@ export async function GET(
     direction: r.metric_direction,
     puzzleDate: r.puzzle_date,
   }));
-
-  const players = computeGameBoard(entries, today, start).map((s) => ({
+  const players = computeMedalBoard(datedEntries, start).map((s) => ({
     displayName: names.get(s.playerId) ?? s.playerId,
-    wins: s.wins,
+    gold: s.gold,
+    silver: s.silver,
+    bronze: s.bronze,
     gamesPlayed: s.gamesPlayed,
-    bestValue: s.bestValue,
-    currentStreak: s.currentStreak,
-    longestStreak: s.longestStreak,
+    pb: s.pb,
+    pbFormatted: s.pb === null ? null : formatResult(gameId, s.pb, true, null),
   }));
-  return NextResponse.json({ gameId, window, locked: false, players, viewerName });
+  return NextResponse.json({ gameId, window, mode: "aggregate", locked: false, players, viewerName });
 }

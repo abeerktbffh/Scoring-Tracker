@@ -31,6 +31,7 @@ export const indiaMiniParser: Parser = {
       variant: null,
       value: seconds,
       solved: true,
+      detail: { seconds },
     };
   },
 };

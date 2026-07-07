@@ -16,4 +16,14 @@ describe("computeMe", () => {
     expect(r.recent).toHaveLength(10);
     expect(r.recent[0].puzzleDate).toBe("2026-06-12");
   });
+  it("passes detail through to the recent list", () => {
+    const result = computeMe({
+      today: "2026-07-06",
+      games: [{ id: "wordle", name: "Wordle" }],
+      entries: [
+        { gameId: "wordle", variant: null, puzzleDate: "2026-07-06", value: 3, solved: true, direction: "lower_better", detail: { guesses: 3, solved: true, hardMode: false, grid: [] } },
+      ],
+    });
+    expect(result.recent[0].detail).toEqual({ guesses: 3, solved: true, hardMode: false, grid: [] });
+  });
 });

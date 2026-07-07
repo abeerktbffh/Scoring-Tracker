@@ -1,0 +1,16 @@
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.pill {
+  font-family: var(--font-ui);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--r-pill);
+  background: var(--tile-empty);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}

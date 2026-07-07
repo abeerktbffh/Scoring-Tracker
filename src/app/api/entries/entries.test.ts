@@ -131,6 +131,60 @@ describe("POST /api/entries", () => {
     expect(res.status).toBe(200);
   });
 
+  it("persists a paste submission's structured detail into the INSERT as JSONB", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    const detail = { guesses: 3, solved: true, hardMode: false, grid: ["🟩🟩🟩🟩🟩"] };
+    resolveSubmissionMock.mockReturnValue({ ...RESOLVED_SUBMISSION, rawInput: "Wordle 999 3/6", detail });
+    sqlMock
+      .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
+      .mockResolvedValueOnce([]) // prior lookup: none
+      .mockResolvedValueOnce([]); // insert
+
+    const res = await POST(jsonRequest({ rawInput: "Wordle 999 3/6" }));
+    expect(res.status).toBe(200);
+    const insertCall = sqlMock.mock.calls.find((c) =>
+      String((c[0] as TemplateStringsArray).join("")).includes("INSERT INTO entries"),
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall!.slice(1)).toContain(JSON.stringify(detail));
+  });
+
+  it("stores NULL detail for a manual submission (no detail field)", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION); // no `detail` key -> undefined
+    sqlMock
+      .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
+      .mockResolvedValueOnce([]) // prior lookup: none
+      .mockResolvedValueOnce([]); // insert
+
+    const res = await POST(jsonRequest({ gameId: "wordle", value: 4, solved: true }));
+    expect(res.status).toBe(200);
+    const insertCall = sqlMock.mock.calls.find((c) =>
+      String((c[0] as TemplateStringsArray).join("")).includes("INSERT INTO entries"),
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall!.slice(1)).toContain(null);
+  });
+
+  it("writes fresh detail on the supersede path's new INSERT", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    const detail = { guesses: 2, solved: true, hardMode: true, grid: ["🟨🟨"] };
+    resolveSubmissionMock.mockReturnValue({ ...RESOLVED_SUBMISSION, detail });
+    sqlMock
+      .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
+      .mockResolvedValueOnce([{ id: "e_prior", version: 1 }]) // prior entry
+      .mockResolvedValueOnce([]) // supersede update
+      .mockResolvedValueOnce([]); // insert
+
+    const res = await POST(jsonRequest({ gameId: "wordle", value: 4, solved: true }));
+    expect(res.status).toBe(200);
+    const insertCall = sqlMock.mock.calls.find((c) =>
+      String((c[0] as TemplateStringsArray).join("")).includes("INSERT INTO entries"),
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall!.slice(1)).toContain(JSON.stringify(detail));
+  });
+
   it("entries_active_uq collapses NULL variants via COALESCE so they collide in the index", () => {
     // These tests mock `sql`, so they can't exercise real Postgres index behavior — this is a
     // static guard that the schema keeps the NULL-variant fix in place (see schema.sql comment:

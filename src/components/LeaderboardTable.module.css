@@ -79,6 +79,13 @@
   color: var(--accent-2);
 }
 
+.subLine {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 .statCell {
   padding: var(--space-2);
   text-align: right;

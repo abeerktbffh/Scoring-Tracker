@@ -42,9 +42,10 @@ async function supersedeAndInsert(
         await sql`UPDATE entries SET superseded_by = ${entryId} WHERE id = ${prior[0].id} AND superseded_by IS NULL`;
       }
       await sql`
-        INSERT INTO entries (id, user_id, game_id, variant, puzzle_date, puzzle_number, raw_input, parsed_value, solved, is_late, version)
+        INSERT INTO entries (id, user_id, game_id, variant, puzzle_date, puzzle_number, raw_input, parsed_value, solved, is_late, version, detail)
         VALUES (${entryId}, ${userId}, ${resolved.gameId}, ${resolved.variant}, ${puzzleDate},
-          ${resolved.puzzleNumber}, ${resolved.rawInput}, ${resolved.value}, ${resolved.solved}, false, ${version})
+          ${resolved.puzzleNumber}, ${resolved.rawInput}, ${resolved.value}, ${resolved.solved}, false, ${version},
+          ${resolved.detail == null ? null : JSON.stringify(resolved.detail)}::jsonb)
       `;
       return;
     } catch (err) {

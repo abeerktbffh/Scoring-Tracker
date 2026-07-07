@@ -1,27 +1,19 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getLeaderboard, getBoard, getGames } from "@/lib/api";
-import type { OverallRow, GameBoardRow, Game } from "@/lib/api";
+import type { OverallRow, MedalBoardRow, DailyContestRow, Game } from "@/lib/api";
 import { useBoard } from "@/components/BoardContext";
-import { sortPlayers } from "@/lib/leaderboardSort";
-import type { LeaderboardSortKey } from "@/lib/leaderboardSort";
+import { sortByMedals } from "@/lib/leaderboardSort";
 import { Card } from "@/components/Card";
-import { Segmented } from "@/components/Segmented";
+import { GameWindowNav } from "@/components/GameWindowNav";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
-import { Chip } from "@/components/Chip";
+import { MedalBoardTable } from "@/components/MedalBoardTable";
+import { DailyContestTable } from "@/components/DailyContestTable";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { LockedState } from "@/components/LockedState";
-import { Flame } from "@/design/icons";
 import styles from "./page.module.css";
-
-const WINDOW_OPTIONS = [
-  { k: "daily", label: "Daily" },
-  { k: "weekly", label: "Weekly" },
-  { k: "monthly", label: "Monthly" },
-  { k: "all", label: "All" },
-];
 
 type OverallState =
   | { status: "loading" }
@@ -32,12 +24,7 @@ type BoardState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; locked: boolean; rows: GameBoardRow[] };
-
-type GamesState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; games: Game[] };
+  | { status: "ready"; locked: boolean; mode: "daily" | "aggregate"; rows: DailyContestRow[] | MedalBoardRow[] };
 
 export default function Standings(): JSX.Element {
   const { boardId } = useBoard();
@@ -45,227 +32,136 @@ export default function Standings(): JSX.Element {
   // `viewerName`), never localStorage — a brand-new user has no localStorage
   // name but is still identified as "me" as soon as the server knows it.
   const [viewerName, setViewerName] = useState<string | null>(null);
+  const [gameKey, setGameKey] = useState<string>("overall");
   const [windowKey, setWindowKey] = useState<string>("weekly");
-  const [sortKey, setSortKey] = useState<LeaderboardSortKey>("wins");
+  const [games, setGames] = useState<Game[]>([]);
   const [overall, setOverall] = useState<OverallState>({ status: "loading" });
-  const [gamesState, setGamesState] = useState<GamesState>({ status: "loading" });
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [board, setBoard] = useState<BoardState>({ status: "idle" });
-  const isFirstBoardLoad = useRef(true);
+  const first = useRef(true);
+
+  const loadGames = useCallback(() => {
+    getGames(boardId ?? undefined).then((r) => {
+      if (r.ok) setGames(r.data.games);
+    });
+  }, [boardId]);
 
   const loadOverall = useCallback(
     (win: string) => {
       setOverall({ status: "loading" });
-      // The `player` arg is a legacy param the server ignores — viewer
-      // identity is resolved from the session, not a client-supplied value.
-      getLeaderboard(win, undefined, boardId ?? undefined).then((result) => {
-        if (!result.ok) {
-          setOverall({ status: "error", message: result.error });
+      getLeaderboard(win, undefined, boardId ?? undefined).then((r) => {
+        if (!r.ok) {
+          setOverall({ status: "error", message: r.error });
           return;
         }
-        setOverall({ status: "ready", locked: result.data.locked, rows: result.data.players });
-        setViewerName(result.data.viewerName);
+        setOverall({ status: "ready", locked: r.data.locked, rows: r.data.players });
+        setViewerName(r.data.viewerName);
       });
     },
     [boardId]
   );
-
-  const loadGames = useCallback(() => {
-    setGamesState({ status: "loading" });
-    getGames(boardId ?? undefined).then((result) => {
-      if (!result.ok) {
-        setGamesState({ status: "error", message: result.error });
-        return;
-      }
-      setGamesState({ status: "ready", games: result.data.games });
-      if (result.data.games.length > 0) {
-        setSelectedGameId((current) => current ?? result.data.games[0].id);
-      }
-    });
-  }, [boardId]);
 
   const loadBoard = useCallback(
-    (gameId: string, win: string) => {
+    (game: string, win: string) => {
       setBoard({ status: "loading" });
-      getBoard(gameId, win, undefined, boardId ?? undefined).then((result) => {
-        if (!result.ok) {
-          setBoard({ status: "error", message: result.error });
+      getBoard(game, win, undefined, boardId ?? undefined).then((r) => {
+        if (!r.ok) {
+          setBoard({ status: "error", message: r.error });
           return;
         }
-        setBoard({ status: "ready", locked: result.data.locked, rows: result.data.players });
-        setViewerName(result.data.viewerName);
+        setBoard({ status: "ready", locked: r.data.locked, mode: r.data.mode, rows: r.data.players });
+        setViewerName(r.data.viewerName);
       });
     },
     [boardId]
   );
 
   useEffect(() => {
-    if (isFirstBoardLoad.current) {
-      isFirstBoardLoad.current = false;
-    } else {
-      // The board changed: the games list is now scoped to the new group,
-      // so drop the old selection and let loadGames pick the new first game.
-      setSelectedGameId(null);
-      // Also drop any previously-loaded per-game board so a zero-games group
-      // (or the refetch window) doesn't keep showing the old board's table.
+    if (!first.current) {
+      // The board changed: the games list is now scoped to the new group, so
+      // drop any per-game selection/board and fall back to Overall — a stale
+      // per-game selection could point at a game the new board doesn't track.
+      setGameKey("overall");
       setBoard({ status: "idle" });
     }
-    loadOverall(windowKey);
+    first.current = false;
     loadGames();
+    loadOverall(windowKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId]);
 
   useEffect(() => {
-    if (selectedGameId) {
-      loadBoard(selectedGameId, windowKey);
+    if (gameKey === "overall") {
+      loadOverall(windowKey);
+    } else {
+      loadBoard(gameKey, windowKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGameId, windowKey]);
-
-  const handleWindowChange = useCallback(
-    (k: string) => {
-      setWindowKey(k);
-      loadOverall(k);
-    },
-    [loadOverall]
-  );
+  }, [gameKey, windowKey]);
 
   const handleRetryOverall = useCallback(() => loadOverall(windowKey), [loadOverall, windowKey]);
-  const handleRetryGames = useCallback(() => loadGames(), [loadGames]);
-  const handleRetryBoard = useCallback(() => {
-    if (selectedGameId) loadBoard(selectedGameId, windowKey);
-  }, [loadBoard, selectedGameId, windowKey]);
+  const handleRetryBoard = useCallback(() => loadBoard(gameKey, windowKey), [loadBoard, gameKey, windowKey]);
 
   return (
     <div className={styles.wrap}>
-      <h1 className={styles.pageTitle}>Standings</h1>
+      <h1 className={styles.pageTitle}>Board</h1>
 
-      <Segmented options={WINDOW_OPTIONS} value={windowKey} onChange={handleWindowChange} />
+      <GameWindowNav
+        games={games}
+        gameKey={gameKey}
+        onGameChange={setGameKey}
+        windowKey={windowKey}
+        onWindowChange={setWindowKey}
+      />
 
       <Card>
-        {overall.status === "loading" && (
-          <div className={styles.skeletonRows}>
-            <Skeleton h={20} />
-            <Skeleton h={20} />
-            <Skeleton h={20} />
-          </div>
-        )}
-        {overall.status === "error" && <ErrorState message={overall.message} onRetry={handleRetryOverall} />}
-        {overall.status === "ready" && overall.locked && (
-          <LockedState>
-            <p>Log today&apos;s puzzle to reveal today&apos;s standings.</p>
-          </LockedState>
-        )}
-        {overall.status === "ready" && !overall.locked && overall.rows.length === 0 && (
-          <EmptyState title="No standings yet" body="Once results are logged, the overall table will show up here." />
-        )}
-        {overall.status === "ready" && !overall.locked && overall.rows.length > 0 && (
-          <LeaderboardTable
-            rows={sortPlayers(overall.rows, sortKey)}
-            sortKey={sortKey}
-            onSort={setSortKey}
-            me={viewerName ?? undefined}
-          />
-        )}
-      </Card>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Per game</h2>
-
-        {gamesState.status === "loading" && (
-          <div className={styles.chipRow}>
-            <Skeleton w={70} h={26} radius={99} />
-            <Skeleton w={70} h={26} radius={99} />
-            <Skeleton w={70} h={26} radius={99} />
-          </div>
-        )}
-        {gamesState.status === "error" && <ErrorState message={gamesState.message} onRetry={handleRetryGames} />}
-        {gamesState.status === "ready" && gamesState.games.length === 0 && (
-          <EmptyState title="No games yet" body="Games will appear here once they're added." />
-        )}
-        {gamesState.status === "ready" && gamesState.games.length > 0 && (
+        {gameKey === "overall" ? (
           <>
-            <div className={styles.chipRow}>
-              {gamesState.games.map((game) => (
-                <Chip
-                  key={game.id}
-                  active={game.id === selectedGameId}
-                  onClick={() => setSelectedGameId(game.id)}
-                >
-                  {game.name}
-                </Chip>
-              ))}
-            </div>
-
-            <Card>
-              {board.status === "idle" && (
-                <EmptyState title="Pick a game" body="Select a game above to see its board." />
-              )}
-              {board.status === "loading" && (
-                <div className={styles.skeletonRows}>
-                  <Skeleton h={20} />
-                  <Skeleton h={20} />
-                </div>
-              )}
-              {board.status === "error" && <ErrorState message={board.message} onRetry={handleRetryBoard} />}
-              {board.status === "ready" && board.locked && (
-                <LockedState>
-                  <p>Log today&apos;s puzzle to reveal today&apos;s standings.</p>
-                </LockedState>
-              )}
-              {board.status === "ready" && !board.locked && board.rows.length === 0 && (
-                <EmptyState title="No results yet" body="Once this game has results, the board will show up here." />
-              )}
-              {board.status === "ready" && !board.locked && board.rows.length > 0 && (
-                <GameBoardTable rows={board.rows} me={viewerName ?? undefined} />
-              )}
-            </Card>
+            {overall.status === "loading" && (
+              <div className={styles.skeletonRows}>
+                <Skeleton h={20} />
+                <Skeleton h={20} />
+                <Skeleton h={20} />
+              </div>
+            )}
+            {overall.status === "error" && <ErrorState message={overall.message} onRetry={handleRetryOverall} />}
+            {overall.status === "ready" && overall.locked && (
+              <LockedState>
+                <p>Log today&apos;s puzzle to reveal today&apos;s standings.</p>
+              </LockedState>
+            )}
+            {overall.status === "ready" && !overall.locked && overall.rows.length === 0 && (
+              <EmptyState title="No standings yet" body="Once results are logged, the medal tally shows up here." />
+            )}
+            {overall.status === "ready" && !overall.locked && overall.rows.length > 0 && (
+              <LeaderboardTable rows={sortByMedals(overall.rows)} me={viewerName ?? undefined} />
+            )}
+          </>
+        ) : (
+          <>
+            {(board.status === "idle" || board.status === "loading") && (
+              <div className={styles.skeletonRows}>
+                <Skeleton h={20} />
+                <Skeleton h={20} />
+              </div>
+            )}
+            {board.status === "error" && <ErrorState message={board.message} onRetry={handleRetryBoard} />}
+            {board.status === "ready" && board.locked && (
+              <LockedState>
+                <p>Log today&apos;s puzzle to reveal today&apos;s standings.</p>
+              </LockedState>
+            )}
+            {board.status === "ready" && !board.locked && board.rows.length === 0 && (
+              <EmptyState title="No results yet" body="Once this game has results, the board shows up here." />
+            )}
+            {board.status === "ready" && !board.locked && board.rows.length > 0 && board.mode === "daily" && (
+              <DailyContestTable rows={board.rows as DailyContestRow[]} gameId={gameKey} me={viewerName ?? undefined} />
+            )}
+            {board.status === "ready" && !board.locked && board.rows.length > 0 && board.mode === "aggregate" && (
+              <MedalBoardTable rows={board.rows as MedalBoardRow[]} me={viewerName ?? undefined} />
+            )}
           </>
         )}
-      </section>
+      </Card>
     </div>
-  );
-}
-
-interface GameBoardTableProps {
-  rows: GameBoardRow[];
-  me?: string;
-}
-
-function GameBoardTable({ rows, me }: GameBoardTableProps): JSX.Element {
-  return (
-    <table className={styles.boardTable}>
-      <thead>
-        <tr className={styles.boardHeaderRow}>
-          <th className={styles.boardHeaderCell} />
-          <th className={styles.boardHeaderCell}>Player</th>
-          <th className={styles.boardHeaderCell}>Best</th>
-          <th className={styles.boardHeaderCell}>Streak</th>
-          <th className={styles.boardHeaderCell}>Wins</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => {
-          const isMe = row.displayName === me;
-          return (
-            <tr
-              key={row.displayName}
-              className={[styles.boardRow, isMe ? styles.me : ""].filter(Boolean).join(" ")}
-            >
-              <td className={styles.rankCell}>{index + 1}</td>
-              <td className={styles.nameCell}>{row.displayName}</td>
-              <td className={styles.statCell}>{row.bestValue}</td>
-              <td className={styles.statCell}>
-                <span className={styles.streakCell}>
-                  <Flame size={13} />
-                  {row.currentStreak}
-                </span>
-              </td>
-              <td className={styles.statCell}>{row.wins}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
   );
 }

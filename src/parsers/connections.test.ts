@@ -30,6 +30,11 @@ describe("connections parser", () => {
       variant: null,
       value: 2,
       solved: true,
+      detail: {
+        mistakes: 2,
+        solvedAll: true,
+        grid: ["🟩🟦🟪🟪", "🟦🟨🟨🟨", "🟨🟨🟨🟨", "🟩🟩🟩🟩", "🟦🟦🟦🟦", "🟪🟪🟪🟪"],
+      },
     });
   });
   it("marks unsolved when fewer than four groups are found", () => {
@@ -40,9 +45,25 @@ describe("connections parser", () => {
       variant: null,
       value: 4,
       solved: false,
+      detail: {
+        mistakes: 4,
+        solvedAll: false,
+        grid: ["🟩🟦🟪🟨", "🟦🟨🟨🟨", "🟩🟦🟪🟨", "🟦🟨🟩🟪", "🟨🟨🟨🟨"],
+      },
     });
   });
   it("throws on non-Connections text", () => {
     expect(() => connectionsParser.parse("hello")).toThrow();
+  });
+});
+
+describe("connections detail", () => {
+  it("captures mistakes, solvedAll, and the verbatim grid", () => {
+    expect(connectionsParser.parse(SOLVED).detail).toEqual({
+      mistakes: 2,
+      solvedAll: true,
+      grid: ["🟩🟦🟪🟪", "🟦🟨🟨🟨", "🟨🟨🟨🟨", "🟩🟩🟩🟩", "🟦🟦🟦🟦", "🟪🟪🟪🟪"],
+    });
+    expect(connectionsParser.parse(SOLVED).value).toBe(2);
   });
 });

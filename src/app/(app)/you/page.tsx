@@ -2,8 +2,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getMe, getLeaderboard, renameSelf } from "@/lib/api";
 import type { MeResponse, OverallRow } from "@/lib/api";
+import { sortByMedals } from "@/lib/leaderboardSort";
 import { saveName } from "@/lib/rememberMe";
 import { toDayNumber } from "@/lib/day";
+import { formatResult } from "@/lib/formatResult";
 import { Card } from "@/components/Card";
 import { StatCard } from "@/components/StatCard";
 import { StreakBadge } from "@/components/StreakBadge";
@@ -24,7 +26,7 @@ function bestLongestStreak(me: MeResponse): number {
 
 function rankOf(rows: OverallRow[], name: string | null): number | null {
   if (!name) return null;
-  const sorted = [...rows].sort((a, b) => b.wins - a.wins);
+  const sorted = sortByMedals(rows);
   const index = sorted.findIndex((r) => r.displayName === name);
   return index === -1 ? null : index + 1;
 }
@@ -128,8 +130,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
 
   const myRow = rows.find((r) => r.displayName === name);
   const rank = rankOf(rows, name);
-  const wins = myRow?.wins ?? 0;
-  const winRate = myRow?.winRate ?? 0;
+  const golds = myRow?.gold ?? 0;
+  const silvers = myRow?.silver ?? 0;
+  const bronzes = myRow?.bronze ?? 0;
   const bestStreak = bestLongestStreak(me);
   const initial = name.trim().charAt(0).toUpperCase();
 
@@ -210,9 +213,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
       )}
 
       <div className={styles.statRow}>
-        <StatCard value={wins} label="Wins" />
+        <StatCard value={golds} label="Golds" />
         <StatCard value={bestStreak} label="Best streak" />
-        <StatCard value={`${Math.round(winRate * 100)}%`} label="Win rate" />
+        <StatCard value={`🥈${silvers} 🥉${bronzes}`} label="Other medals" />
       </div>
 
       <section className={styles.section}>
@@ -242,7 +245,9 @@ function YouReady({ me, rows, onRenamed }: YouReadyProps): JSX.Element {
                     {r.name}
                     {r.variant ? ` ${r.variant}` : ""}
                   </span>
-                  <span className={styles.recentValue}>{r.value}</span>
+                  <span className={styles.recentValue}>
+                    {formatResult(r.gameId, r.value, r.solved, r.detail)}
+                  </span>
                   <span className={styles.recentDay}>{relativeDay(r.puzzleDate, me.today.date)}</span>
                 </li>
               ))}

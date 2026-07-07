@@ -7,6 +7,7 @@ describe("resolveSubmission", () => {
     expect(r).toEqual({
       gameId: "wordle", puzzleNumber: 1838, variant: null,
       value: 3, solved: true, rawInput: "Wordle 1,838 3/6",
+      detail: { guesses: 3, solved: true, hardMode: false, grid: [] },
     });
   });
   it("paste mode: 422 when unparseable", () => {

@@ -20,6 +20,7 @@ describe("pinpoint parser", () => {
       variant: null,
       value: 3,
       solved: true,
+      detail: { guesses: 3, solved: true, trail: [33, 3, 100] },
     });
   });
 
@@ -34,5 +35,12 @@ describe("pinpoint parser", () => {
 
   it("throws on non-Pinpoint text", () => {
     expect(() => pinpointParser.parse("Wordle 1,838 3/6")).toThrow();
+  });
+});
+
+describe("pinpoint detail", () => {
+  it("captures guesses, solved, and the %-match trail", () => {
+    expect(pinpointParser.parse(SAMPLE).detail).toEqual({ guesses: 3, solved: true, trail: [33, 3, 100] });
+    expect(pinpointParser.parse(SAMPLE).value).toBe(3);
   });
 });

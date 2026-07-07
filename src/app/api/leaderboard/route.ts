@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "@/db/client";
 import { requireUser, requireMember } from "@/lib/membership";
 import { PLATFORM_TZ } from "@/lib/group";
-import { computeOverall } from "@/scoring/leaderboard";
+import { computeOverallMedals } from "@/scoring/medals";
 import type { GameEntry } from "@/scoring/wins";
 import { localDateInTz } from "@/lib/day";
 import { windowStart, type Window } from "@/lib/window";
@@ -107,11 +107,13 @@ export async function GET(req: Request) {
     direction: r.metric_direction,
   }));
 
-  const players = computeOverall(gameEntries).map((s) => ({
+  const players = computeOverallMedals(gameEntries).map((s) => ({
     displayName: names.get(s.playerId) ?? s.playerId,
-    wins: s.wins,
+    gold: s.gold,
+    silver: s.silver,
+    bronze: s.bronze,
     gamesPlayed: s.gamesPlayed,
-    winRate: s.winRate,
+    gamesLed: s.gamesLed, // gameIds; the client maps ids→names via its games catalog
   }));
   return NextResponse.json({ window, locked, players, viewerName: guard.viewer.displayName ?? null });
 }

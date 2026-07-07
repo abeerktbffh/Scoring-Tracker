@@ -19,6 +19,7 @@ describe("minute cryptic parser", () => {
       variant: null,
       value: 0,
       solved: true,
+      detail: { hints: 0, underPar: 3 },
     });
   });
   it("parses a non-zero hint count", () => {
@@ -30,5 +31,11 @@ describe("minute cryptic parser", () => {
   });
   it("throws on non-Minute-Cryptic text", () => {
     expect(() => minuteCrypticParser.parse("hello")).toThrow();
+  });
+});
+
+describe("minute cryptic detail", () => {
+  it("captures hints and under-community-par", () => {
+    expect(minuteCrypticParser.parse(SAMPLE).detail).toEqual({ hints: 0, underPar: 3 });
   });
 });

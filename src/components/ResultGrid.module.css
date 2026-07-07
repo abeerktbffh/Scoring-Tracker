@@ -1,0 +1,16 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 18px;
+  line-height: 1.1;
+  margin-top: var(--space-2);
+}
+
+.gridRow {
+  letter-spacing: 1px;
+}
+
+.dim {
+  opacity: 0.4;
+}

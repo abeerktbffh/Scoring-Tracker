@@ -24,6 +24,11 @@ export const connectionsParser: Parser = {
       variant: null,
       value: rows.length - mono,
       solved: mono === 4,
+      detail: {
+        mistakes: rows.length - mono,
+        solvedAll: mono === 4,
+        grid: rows.map((r) => r.join("")),
+      },
     };
   },
 };

@@ -2,6 +2,9 @@
 // Wraps fetch calls to the existing backend routes and normalizes results into
 // a discriminated union so callers never need to touch raw Response objects.
 
+import type { ResultDetail } from "@/parsers/types";
+export type { ResultDetail } from "@/parsers/types";
+
 export interface Game {
   id: string;
   name: string;
@@ -10,20 +13,35 @@ export interface Game {
   hasVariants: boolean;
 }
 
-export interface OverallRow {
-  displayName: string;
-  wins: number;
-  gamesPlayed: number;
-  winRate: number;
+export type Medal = "gold" | "silver" | "bronze";
+
+export interface MedalCounts {
+  gold: number;
+  silver: number;
+  bronze: number;
 }
 
-export interface GameBoardRow {
+export interface OverallRow extends MedalCounts {
   displayName: string;
-  wins: number;
   gamesPlayed: number;
-  bestValue: number;
-  currentStreak: number;
-  longestStreak: number;
+  gamesLed: string[];
+}
+
+export interface MedalBoardRow extends MedalCounts {
+  displayName: string;
+  gamesPlayed: number;
+  pb: number | null;
+  pbFormatted: string | null;
+}
+
+export interface DailyContestRow {
+  displayName: string;
+  value: number;
+  valueFormatted: string;
+  solved: boolean;
+  medal: Medal | null;
+  detail: ResultDetail | null;
+  variant: string | null;
 }
 
 export interface Player {
@@ -46,6 +64,7 @@ export interface MeResponse {
     value: number;
     solved: boolean;
     puzzleDate: string;
+    detail: ResultDetail | null;
   }[];
   displayName: string | null;
 }
@@ -149,7 +168,14 @@ export function getBoard(
   player?: string,
   group?: string
 ): Promise<
-  ApiResult<{ gameId: string; window: string; locked: boolean; players: GameBoardRow[]; viewerName: string | null }>
+  ApiResult<{
+    gameId: string;
+    window: string;
+    mode: "daily" | "aggregate";
+    locked: boolean;
+    players: DailyContestRow[] | MedalBoardRow[];
+    viewerName: string | null;
+  }>
 > {
   const params = new URLSearchParams();
   if (window !== undefined) params.set("window", window);
