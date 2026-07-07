@@ -96,6 +96,7 @@ describe("GET /api/games/[gameId]/board", () => {
           solved: true,
           medal: "gold",
           detail: null,
+          variant: null,
         },
       ],
       viewerName: "Session Player",
@@ -130,6 +131,80 @@ describe("GET /api/games/[gameId]/board", () => {
     const res = await GET(req(), { params: { gameId: "g_wordle" } });
     const body = await res.json();
     expect(body.players[0].detail).toEqual(detail);
+  });
+
+  it("Pips today: ranks each difficulty as its own sub-contest and keeps a player's two same-day rows from colliding on detail", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    const easyDetail = { seconds: 120, backtracks: 0 };
+    const hardDetail = { seconds: 300, backtracks: 2 };
+    sqlMock.mockResolvedValueOnce([
+      // u_session logs BOTH difficulties today — this is the collision case:
+      // detailById must be keyed by variant too, or one overwrites the other.
+      {
+        user_id: "u_session",
+        display_name: "Session Player",
+        variant: "easy",
+        puzzle_date: TODAY,
+        parsed_value: 120,
+        solved: true,
+        detail: easyDetail,
+        metric_direction: "lower_better",
+      },
+      {
+        user_id: "u_session",
+        display_name: "Session Player",
+        variant: "hard",
+        puzzle_date: TODAY,
+        parsed_value: 300,
+        solved: true,
+        detail: hardDetail,
+        metric_direction: "lower_better",
+      },
+      // u_other only plays hard, and is slower — but numerically their value
+      // (400s) would still lose to easy's 120s in a merged ranking; per-group
+      // ranking must still give them silver within the hard group, not be
+      // pushed out of medals entirely by the easy group's faster time.
+      {
+        user_id: "u_other",
+        display_name: "Other Player",
+        variant: "hard",
+        puzzle_date: TODAY,
+        parsed_value: 400,
+        solved: true,
+        detail: null,
+        metric_direction: "lower_better",
+      },
+    ]);
+    sqlMock.mockResolvedValueOnce([{}]); // viewer played today
+
+    const res = await GET(req("http://localhost/api/games/g_pips/board"), {
+      params: { gameId: "g_pips" },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.mode).toBe("daily");
+    expect(body.locked).toBe(false);
+
+    const byVariantAndName = Object.fromEntries(
+      body.players.map((p: { variant: string | null; displayName: string }) => [`${p.variant}|${p.displayName}`, p]),
+    );
+
+    // Each difficulty group medals independently.
+    const easyRow = byVariantAndName["easy|Session Player"];
+    const hardSessionRow = byVariantAndName["hard|Session Player"];
+    const hardOtherRow = byVariantAndName["hard|Other Player"];
+    expect(easyRow).toMatchObject({ variant: "easy", medal: "gold", valueFormatted: "2:00", detail: easyDetail });
+    expect(hardSessionRow).toMatchObject({ variant: "hard", medal: "gold", valueFormatted: "5:00", detail: hardDetail });
+    expect(hardOtherRow).toMatchObject({ variant: "hard", medal: "silver", valueFormatted: "6:40", detail: null });
+
+    // The Session Player's two rows carry their OWN variant-specific detail —
+    // no cross-variant leakage from the user_id|puzzle_date collision.
+    expect(easyRow.detail).toEqual(easyDetail);
+    expect(hardSessionRow.detail).toEqual(hardDetail);
+    expect(easyRow.detail).not.toEqual(hardSessionRow.detail);
+
+    // Output is grouped: easy rows before hard rows.
+    expect(body.players.map((p: { variant: string | null }) => p.variant)).toEqual(["easy", "hard", "hard"]);
   });
 
   it("no-peek keys on the viewer's userId, not any player id", async () => {

@@ -15,6 +15,17 @@ function hasDetail(row: DailyContestRow): boolean {
   return !!d && Object.keys(d).length > 0;
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Composite expand-state key: a player can appear in more than one variant
+// group (e.g. logged both Pips easy and hard today), so expansion must be
+// scoped per (variant, player) — never shared across groups.
+function expandKey(row: DailyContestRow): string {
+  return `${row.variant ?? ""}|${row.displayName}`;
+}
+
 export interface DailyContestTableProps {
   rows: DailyContestRow[];
   gameId: string;
@@ -22,8 +33,13 @@ export interface DailyContestTableProps {
 }
 
 export function DailyContestTable({ rows, gameId, me }: DailyContestTableProps): JSX.Element {
-  const [openName, setOpenName] = useState<string | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const showGrid = GRID_SHAPES.has(shapeForGame(gameId)) && gameId !== "minute-cryptic"; // minute-cryptic is hints-shaped but gridless
+
+  let lastVariant: string | null = null;
+  let rankInGroup = 0;
+  let seenFirstGroup = false;
+
   return (
     <table className={styles.boardTable}>
       <thead>
@@ -35,18 +51,34 @@ export function DailyContestTable({ rows, gameId, me }: DailyContestTableProps):
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, index) => {
+        {rows.map((row) => {
+          const variant = row.variant ?? null;
+          const isNewGroup = !seenFirstGroup || variant !== lastVariant;
+          if (isNewGroup) {
+            lastVariant = variant;
+            rankInGroup = 0;
+            seenFirstGroup = true;
+          }
+          rankInGroup += 1;
+          const rank = rankInGroup;
+
+          const key = expandKey(row);
           const expandable = hasDetail(row);
-          const open = openName === row.displayName;
+          const open = openKey === key;
           const grid = row.detail?.grid;
           const dim =
             gameId === "connections" && grid
               ? grid.map((line) => new Set(line).size > 1) // mixed rows = mistakes → dim
               : undefined;
           return (
-            <React.Fragment key={row.displayName}>
+            <React.Fragment key={key}>
+              {isNewGroup && variant !== null && (
+                <tr className={styles.variantHeaderRow}>
+                  <td colSpan={4} className={styles.variantHeaderCell}>{capitalize(variant)}</td>
+                </tr>
+              )}
               <tr className={[styles.boardRow, row.displayName === me ? styles.me : ""].filter(Boolean).join(" ")}>
-                <td className={styles.rankCell}>{index + 1}</td>
+                <td className={styles.rankCell}>{rank}</td>
                 <td className={styles.nameCell}>{row.displayName}</td>
                 <td className={styles.statCell}>
                   {row.medal ? `${MEDAL_EMOJI[row.medal]} ` : ""}
@@ -58,7 +90,7 @@ export function DailyContestTable({ rows, gameId, me }: DailyContestTableProps):
                       type="button"
                       className={[styles.expandBtn, open ? styles.expandBtnOpen : ""].filter(Boolean).join(" ")}
                       aria-label={open ? "Hide details" : "Show details"}
-                      onClick={() => setOpenName(open ? null : row.displayName)}
+                      onClick={() => setOpenKey(open ? null : key)}
                     >
                       <ChevronDown size={16} />
                     </button>

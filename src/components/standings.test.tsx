@@ -19,7 +19,7 @@ const games: Game[] = [{ id: "wordle", name: "Wordle", type: "outcome", metricDi
 const overall: OverallRow[] = [{ displayName: "DJ", gold: 3, silver: 1, bronze: 0, gamesPlayed: 10, gamesLed: ["wordle"] }];
 const medalRows: MedalBoardRow[] = [{ displayName: "DJ", gold: 2, silver: 0, bronze: 1, gamesPlayed: 5, pb: 2, pbFormatted: "2/6 ✓" }];
 const contestRows: DailyContestRow[] = [
-  { displayName: "DJ", value: 2, valueFormatted: "2/6 ✓", solved: true, medal: "gold", detail: null },
+  { displayName: "DJ", value: 2, valueFormatted: "2/6 ✓", solved: true, medal: "gold", detail: null, variant: null },
 ];
 
 beforeEach(() => {

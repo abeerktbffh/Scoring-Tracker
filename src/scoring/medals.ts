@@ -127,14 +127,33 @@ export interface DailyContestStat {
   value: number;
   solved: boolean;
   medal: Medal | null;
+  variant: string | null;
+}
+
+// Pips' difficulties rank in this fixed order within the Today board; any
+// other (future) variant sorts alphabetically after them. null (non-variant
+// games) always sorts first.
+const PIPS_ORDER: Record<string, number> = { easy: 0, medium: 1, hard: 2 };
+
+function compareVariant(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return -1;
+  if (b === null) return 1;
+  const ra = PIPS_ORDER[a];
+  const rb = PIPS_ORDER[b];
+  if (ra !== undefined && rb !== undefined) return ra - rb;
+  if (ra !== undefined) return -1;
+  if (rb !== undefined) return 1;
+  return a.localeCompare(b);
 }
 
 /**
- * Today's live contest for a single game/day. Solved entries ranked by
- * direction; unsolved sink to the bottom (by playerId). Medal by distinct-value
- * rank among solved (gold/silver/bronze; co-winners tie for gold). PURE.
+ * Today's live contest for a single (game, variant) group. Solved entries
+ * ranked by direction; unsolved sink to the bottom (by playerId). Medal by
+ * distinct-value rank among solved (gold/silver/bronze; co-winners tie for
+ * gold). PURE.
  */
-export function computeDailyContest(entries: GameEntry[]): DailyContestStat[] {
+function computeGroupContest(entries: GameEntry[], variant: string | null): DailyContestStat[] {
   const solved = entries.filter((e) => e.solved);
   const unsolved = entries.filter((e) => !e.solved);
   const dir = entries[0]?.direction ?? "lower_better";
@@ -150,14 +169,39 @@ export function computeDailyContest(entries: GameEntry[]): DailyContestStat[] {
       value: e.value,
       solved: true,
       medal: MEDAL_BY_RANK[distinct.indexOf(e.value)] ?? null,
+      variant,
     }));
 
   const unsolvedRows: DailyContestStat[] = unsolved
     .slice()
     .sort((a, b) => a.playerId.localeCompare(b.playerId))
-    .map((e) => ({ playerId: e.playerId, value: e.value, solved: false, medal: null }));
+    .map((e) => ({ playerId: e.playerId, value: e.value, solved: false, medal: null, variant }));
 
   return [...solvedRows, ...unsolvedRows];
+}
+
+/**
+ * Today's live contest for a game. Entries are split into per-variant
+ * sub-contests (null/absent variant = the whole game is one group, which is
+ * every game except Pips) so difficulties never rank against each other;
+ * each group gets its own placement/medals via the same dense-ranking rule.
+ * Groups are ordered null first, then Pips difficulties (easy/medium/hard),
+ * then any other variant alphabetically. PURE.
+ */
+export function computeDailyContest(entries: GameEntry[]): DailyContestStat[] {
+  const groups = new Map<string | null, GameEntry[]>();
+  for (const e of entries) {
+    const variant = e.variant ?? null;
+    let g = groups.get(variant);
+    if (!g) {
+      g = [];
+      groups.set(variant, g);
+    }
+    g.push(e);
+  }
+
+  const orderedVariants = [...groups.keys()].sort(compareVariant);
+  return orderedVariants.flatMap((variant) => computeGroupContest(groups.get(variant)!, variant));
 }
 
 export interface OverallMedalStat extends MedalCounts {

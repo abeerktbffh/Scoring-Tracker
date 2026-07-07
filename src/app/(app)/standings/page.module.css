@@ -132,3 +132,15 @@
 .detailCell {
   padding: var(--space-1) var(--space-2) var(--space-3);
 }
+
+.variantHeaderRow {
+  border-bottom: 1px solid var(--line);
+}
+
+.variantHeaderCell {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}

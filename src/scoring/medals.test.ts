@@ -198,6 +198,7 @@ describe("computeDailyContest", () => {
     const rows = computeDailyContest([e("a", 4), e("b", 2), e("c", 3), e("d", 9, false)]);
     expect(rows.map((r) => r.playerId)).toEqual(["b", "c", "a", "d"]);
     expect(rows.map((r) => r.medal)).toEqual(["gold", "silver", "bronze", null]);
+    expect(rows.every((r) => r.variant === null)).toBe(true);
   });
 
   it("co-winners tie for gold; the next distinct value is silver", () => {
@@ -216,25 +217,65 @@ describe("computeDailyContest", () => {
   it("ranks three distinct solved values and assigns correct medals (gold/silver/bronze)", () => {
     const rows = computeDailyContest([e("a", 2), e("b", 3), e("c", 4)]);
     expect(rows).toEqual([
-      { playerId: "a", value: 2, solved: true, medal: "gold" },
-      { playerId: "b", value: 3, solved: true, medal: "silver" },
-      { playerId: "c", value: 4, solved: true, medal: "bronze" },
+      { playerId: "a", value: 2, solved: true, medal: "gold", variant: null },
+      { playerId: "b", value: 3, solved: true, medal: "silver", variant: null },
+      { playerId: "c", value: 4, solved: true, medal: "bronze", variant: null },
     ]);
   });
 
   it("returns all unsolved entries with no medals, ordered by playerId", () => {
     const rows = computeDailyContest([e("c", 5, false), e("a", 3, false), e("b", 4, false)]);
     expect(rows).toEqual([
-      { playerId: "a", value: 3, solved: false, medal: null },
-      { playerId: "b", value: 4, solved: false, medal: null },
-      { playerId: "c", value: 5, solved: false, medal: null },
+      { playerId: "a", value: 3, solved: false, medal: null, variant: null },
+      { playerId: "b", value: 4, solved: false, medal: null, variant: null },
+      { playerId: "c", value: 5, solved: false, medal: null, variant: null },
     ]);
   });
 
   it("single solved entry wins gold", () => {
     const rows = computeDailyContest([e("x", 42)]);
     expect(rows).toEqual([
-      { playerId: "x", value: 42, solved: true, medal: "gold" },
+      { playerId: "x", value: 42, solved: true, medal: "gold", variant: null },
     ]);
+  });
+
+  it("separates variant groups (Pips difficulties) into independent sub-contests, each with its own gold, ordered easy then hard", () => {
+    const v = (playerId: string, variant: string, value: number, solved = true): GameEntry => ({
+      playerId, gameId: "pips", variant, puzzleKey: "pips|2026-07-06",
+      value, solved, direction: "lower_better",
+    });
+    // Easy group: a=2:00 wins easy gold despite being slower in real terms
+    // than the hard group's best; hard group: b=5:00 wins hard gold even
+    // though it's numerically worse than easy's winner — groups never
+    // compete against each other.
+    const rows = computeDailyContest([
+      v("a", "easy", 120), // easy gold
+      v("c", "easy", 180), // easy silver
+      v("b", "hard", 300), // hard gold (would lose to "a" in a merged ranking)
+      v("d", "hard", 400), // hard silver
+    ]);
+    expect(rows).toEqual([
+      { playerId: "a", value: 120, solved: true, medal: "gold", variant: "easy" },
+      { playerId: "c", value: 180, solved: true, medal: "silver", variant: "easy" },
+      { playerId: "b", value: 300, solved: true, medal: "gold", variant: "hard" },
+      { playerId: "d", value: 400, solved: true, medal: "silver", variant: "hard" },
+    ]);
+    // Output is ordered easy-group then hard-group (not interleaved/merged).
+    expect(rows.map((r) => r.variant)).toEqual(["easy", "easy", "hard", "hard"]);
+  });
+
+  it("orders variant groups null-first, then Pips easy/medium/hard, then other variants alphabetically", () => {
+    const v = (playerId: string, variant: string | null, value: number): GameEntry => ({
+      playerId, gameId: "pips", variant, puzzleKey: "pips|2026-07-06",
+      value, solved: true, direction: "lower_better",
+    });
+    const rows = computeDailyContest([
+      v("h", "hard", 1),
+      v("z", "zzz-future-variant", 1),
+      v("n", null, 1),
+      v("m", "medium", 1),
+      v("e", "easy", 1),
+    ]);
+    expect(rows.map((r) => r.variant)).toEqual([null, "easy", "medium", "hard", "zzz-future-variant"]);
   });
 });

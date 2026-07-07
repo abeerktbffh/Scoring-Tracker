@@ -41,6 +41,7 @@ export interface DailyContestRow {
   solved: boolean;
   medal: Medal | null;
   detail: ResultDetail | null;
+  variant: string | null;
 }
 
 export interface Player {

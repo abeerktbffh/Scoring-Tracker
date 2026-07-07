@@ -101,7 +101,9 @@ export async function GET(
   }
 
   const names = new Map(rows.map((r) => [r.user_id, r.display_name]));
-  const detailById = new Map(rows.map((r) => [`${r.user_id}|${r.puzzle_date}`, r.detail ?? null]));
+  const detailById = new Map(
+    rows.map((r) => [`${r.user_id}|${r.puzzle_date}|${r.variant ?? ""}`, r.detail ?? null]),
+  );
 
   if (window === "daily") {
     // Live contest: today's single puzzle for this game.
@@ -115,14 +117,18 @@ export async function GET(
       solved: r.solved,
       direction: r.metric_direction,
     }));
-    const players = computeDailyContest(contestEntries).map((s) => ({
-      displayName: names.get(s.playerId) ?? s.playerId,
-      value: s.value,
-      valueFormatted: formatResult(gameId, s.value, s.solved, detailById.get(`${s.playerId}|${today}`) ?? null),
-      solved: s.solved,
-      medal: s.medal as Medal | null,
-      detail: detailById.get(`${s.playerId}|${today}`) ?? null,
-    }));
+    const players = computeDailyContest(contestEntries).map((s) => {
+      const detail = detailById.get(`${s.playerId}|${today}|${s.variant ?? ""}`) ?? null;
+      return {
+        displayName: names.get(s.playerId) ?? s.playerId,
+        value: s.value,
+        valueFormatted: formatResult(gameId, s.value, s.solved, detail),
+        solved: s.solved,
+        medal: s.medal as Medal | null,
+        detail,
+        variant: s.variant,
+      };
+    });
     return NextResponse.json({ gameId, window, mode: "daily", locked: false, players, viewerName });
   }
 
