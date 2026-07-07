@@ -99,6 +99,16 @@ describe("GET /api/me", () => {
     expect(requireMemberMock).not.toHaveBeenCalled();
   });
 
+  it("excludes entries for inactive games from the global (ungrouped) You list", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await GET(req());
+    const entriesCall = sqlMock.mock.calls[1];
+    const entriesQueryText = entriesCall[0].join(" ").replace(/\s+/g, " ");
+    expect(entriesQueryText).toContain("g.active = true");
+  });
+
   it("403s a non-member requesting ?group=g1, never touching the DB", async () => {
     requireMemberMock.mockResolvedValue({ ok: false, status: 403, error: "Not a member" });
 

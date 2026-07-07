@@ -65,6 +65,7 @@ export async function GET(req: Request) {
         FROM entries e
         JOIN games g ON g.id = e.game_id
         WHERE e.user_id = ${viewerUserId} AND e.superseded_by IS NULL AND e.is_late = false
+          AND g.active = true
       `) as {
     game_id: string;
     variant: string | null;
