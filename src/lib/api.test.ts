@@ -17,6 +17,7 @@ import {
   getBoard,
   getMe,
   getGames,
+  mintImportToken,
 } from "./api";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -239,5 +240,25 @@ describe("optional group param on read fns", () => {
   it("getGames omits group when not provided", async () => {
     await getGames();
     expect(fetchMock).toHaveBeenCalledWith("/api/games", undefined);
+  });
+});
+
+describe("mintImportToken", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("POSTs to /api/me/import-token and returns the token", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { token: "abc123" }));
+    const res = await mintImportToken();
+    expect(fetchMock).toHaveBeenCalledWith("/api/me/import-token", expect.objectContaining({ method: "POST" }));
+    expect(res).toEqual({ ok: true, data: { token: "abc123" } });
   });
 });
