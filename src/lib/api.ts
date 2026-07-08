@@ -215,6 +215,10 @@ export function renameSelf(
   return request("/api/me/rename", jsonPost({ newName }));
 }
 
+export function mintImportToken(): Promise<ApiResult<{ token: string }>> {
+  return request("/api/me/import-token", jsonPost({}));
+}
+
 export function createGroup(
   name: string,
   gameIds: string[]
