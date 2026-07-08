@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 
 const mintMock = vi.fn();
-vi.mock("@/lib/api", () => ({ mintImportToken: mintMock }));
+const getMeMock = vi.fn();
+vi.mock("@/lib/api", () => ({ mintImportToken: mintMock, getMe: getMeMock }));
 vi.mock("@/lib/platform", () => ({ detectPlatform: () => "ios" }));
 
 const { default: Setup } = await import("./page");
@@ -35,6 +36,17 @@ describe("/setup (iOS)", () => {
     await waitFor(() => expect(mintMock).toHaveBeenCalled());
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("key_xyz");
     expect(await screen.findByText(/copied/i)).toBeTruthy();
+  });
+
+  it("Check that it worked shows the viewer's latest logged result", async () => {
+    getMeMock.mockResolvedValue({
+      ok: true,
+      data: { displayName: "Dev", recent: [{ gameId: "wordle", value: 4, solved: true, detail: null, puzzleDate: "2026-07-08" }] },
+    });
+    render(<Setup />);
+    fireEvent.click(screen.getByRole("button", { name: /check that it worked/i }));
+    await waitFor(() => expect(getMeMock).toHaveBeenCalled());
+    expect(await screen.findByText(/wordle/i)).toBeTruthy();
   });
 
   it("uses the baked-in shortcut link when no env override is set", () => {
