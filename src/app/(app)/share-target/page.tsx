@@ -35,7 +35,7 @@ function ShareTargetInner(): JSX.Element {
       {state.status === "success" && (
         <>
           <p className={styles.ok}>✓ Logged {state.game}</p>
-          <Link className={styles.link} href="/">See the board</Link>
+          <Link className={styles.link} href="/standings">See the board</Link>
         </>
       )}
       {state.status === "error" && (
