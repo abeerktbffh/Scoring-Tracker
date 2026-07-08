@@ -174,10 +174,11 @@ describe("/setup (iOS)", () => {
     expect(await screen.findByText(/copied/i)).toBeTruthy();
   });
 
-  it("degrades gracefully when the shortcut link isn't configured", () => {
+  it("uses the baked-in shortcut link when no env override is set", () => {
     delete process.env.NEXT_PUBLIC_IOS_SHORTCUT_URL;
     render(<Setup />);
-    expect(screen.getByText(/coming soon/i)).toBeTruthy();
+    const link = screen.getByRole("link", { name: /add the bragboard shortcut/i });
+    expect(link.getAttribute("href")).toContain("icloud.com/shortcuts/");
   });
 });
 ```
@@ -192,7 +193,11 @@ import { detectPlatform } from "@/lib/platform";
 import { mintImportToken } from "@/lib/api";
 import styles from "./page.module.css";
 
-const SHORTCUT_URL = process.env.NEXT_PUBLIC_IOS_SHORTCUT_URL;
+// The shared "Start Bragging" shortcut. Public + stable (the per-user key is an
+// iOS Import Question, so nothing secret travels in the link). Baked as the
+// default; NEXT_PUBLIC_IOS_SHORTCUT_URL can override it if it ever changes.
+const DEFAULT_SHORTCUT_URL = "https://www.icloud.com/shortcuts/c3ecc98935394c6e94b1b7a039d5a598";
+const SHORTCUT_URL = process.env.NEXT_PUBLIC_IOS_SHORTCUT_URL || DEFAULT_SHORTCUT_URL;
 
 function CopyKey(): JSX.Element {
   const [copied, setCopied] = useState(false);
@@ -222,7 +227,7 @@ function IosSteps(): JSX.Element {
           ? <a className={styles.btn} href={SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Add the Bragboard shortcut</a>
           : <span className={styles.muted}>iPhone setup is coming soon.</span>}
       </li>
-      <li><CopyKey /><span className={styles.muted}>Paste your key when the shortcut asks for it.</span></li>
+      <li><CopyKey /><span className={styles.muted}>When you add the shortcut, it asks <b>"Paste your Bragboard key"</b> — paste it there. (Confirmed: the shortcut uses an iOS Import Question, so there's no editing.)</span></li>
       <li><span className={styles.muted}>Tap <b>Allow</b> the first time the shortcut runs.</span></li>
       <li><span className={styles.muted}>In a game's Share sheet, if you don't see <b>Start Bragging</b>, tap <b>More</b> and turn it on once.</span></li>
     </ol>
@@ -399,11 +404,10 @@ git commit -m "feat(setup): Check that it worked shows the viewer's latest resul
 
 ## Deploy (gated — owner go-ahead; no migration)
 
-Pure code + one Vercel env var. Sequence:
-1. **Owner builds the iOS Shortcut** from `docs/auto-import-ios-shortcut-recipe.md`, shares the iCloud link.
-2. Set **`NEXT_PUBLIC_IOS_SHORTCUT_URL`** in Vercel (Production) to that link.
-3. Backup tag `main`; **merge** the branch → prod auto-deploys. (No DB migration, no backfill.)
-The screen degrades gracefully if the env var is set after deploy — so code can merge first and the link can be flipped on once the shortcut exists. Nothing to prod without explicit go-ahead.
+Pure code — **no migration, no env var required** (the "Start Bragging" iCloud link is already built and baked in as `DEFAULT_SHORTCUT_URL`; the import-question prompt is confirmed working). Sequence:
+1. Backup tag `main`.
+2. **Merge** the branch → prod auto-deploys.
+Nothing to prod without explicit go-ahead.
 
 ## Out of scope
 
