@@ -5,8 +5,17 @@ const authMock = vi.fn();
 vi.mock("@/db/client", () => ({ sql: sqlMock }));
 vi.mock("@/auth/config", () => ({ auth: authMock }));
 
-const { resolveViewer, authzResult, requireUser, requireSuperAdmin, roleFor, requireMember, requireGroupAdmin } =
-  await import("./membership");
+const {
+  resolveViewer,
+  authzResult,
+  requireUser,
+  requireSuperAdmin,
+  roleFor,
+  requireMember,
+  requireGroupAdmin,
+  resolveViewerByImportToken,
+  requireUserOrImportToken,
+} = await import("./membership");
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -79,5 +88,40 @@ describe("group guards", () => {
     sqlMock.mockResolvedValueOnce([{ display_name: "B", is_super_admin: false }]);
     sqlMock.mockResolvedValueOnce([{ role: "admin" }]);
     expect((await requireGroupAdmin("g_x")).ok).toBe(true);
+  });
+});
+
+describe("import-token auth", () => {
+  it("resolveViewerByImportToken returns the viewer for a known token", async () => {
+    sqlMock.mockResolvedValueOnce([{ id: "u9", display_name: "Dev", is_super_admin: false }]);
+    const v = await resolveViewerByImportToken("tok");
+    expect(v).toEqual({ userId: "u9", displayName: "Dev", isSuperAdmin: false });
+  });
+
+  it("resolveViewerByImportToken returns null for an unknown token", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    expect(await resolveViewerByImportToken("nope")).toBeNull();
+  });
+
+  it("requireUserOrImportToken: valid bearer → ok viewer", async () => {
+    sqlMock.mockResolvedValueOnce([{ id: "u9", display_name: "Dev", is_super_admin: false }]);
+    const req = new Request("http://x/api/entries", { headers: { authorization: "Bearer tok" } });
+    const g = await requireUserOrImportToken(req);
+    expect(g).toEqual({ ok: true, viewer: { userId: "u9", displayName: "Dev", isSuperAdmin: false } });
+  });
+
+  it("requireUserOrImportToken: unknown bearer → 401, never falls through to session", async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    const req = new Request("http://x/api/entries", { headers: { authorization: "Bearer bad" } });
+    const g = await requireUserOrImportToken(req);
+    expect(g).toEqual({ ok: false, status: 401, error: "Unauthenticated" });
+  });
+
+  it("requireUserOrImportToken: no bearer → delegates to the session path", async () => {
+    // No Authorization header → resolveViewer() runs; with no session it 401s.
+    authMock.mockResolvedValue(null);
+    const req = new Request("http://x/api/entries");
+    const g = await requireUserOrImportToken(req);
+    expect(g.ok).toBe(false);
   });
 });
