@@ -8,7 +8,7 @@ const resolveSubmissionMock = vi.fn();
 const captureMessageMock = vi.fn();
 const flushMock = vi.fn();
 
-vi.mock("@/lib/membership", () => ({ requireUser: guardMock }));
+vi.mock("@/lib/membership", () => ({ requireUserOrImportToken: guardMock }));
 vi.mock("@/db/client", () => ({ sql: sqlMock }));
 vi.mock("@/lib/submission", () => ({ resolveSubmission: resolveSubmissionMock }));
 vi.mock("@sentry/nextjs", () => ({
@@ -183,6 +183,36 @@ describe("POST /api/entries", () => {
     );
     expect(insertCall).toBeDefined();
     expect(insertCall!.slice(1)).toContain(JSON.stringify(detail));
+  });
+
+  it("logs via a valid import token (bearer) using the shared write path", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION);
+    sqlMock
+      .mockResolvedValueOnce([{ id: "wordle" }]) // game exists
+      .mockResolvedValueOnce([])                 // prior lookup (none)
+      .mockResolvedValueOnce(undefined);         // insert
+    const req = new Request("http://localhost/api/entries", {
+      method: "POST",
+      headers: { authorization: "Bearer tok" },
+      body: JSON.stringify({ rawInput: "Wordle 999 4/6" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("429s a token caller past the per-user limit", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    resolveSubmissionMock.mockReturnValue(RESOLVED_SUBMISSION);
+    sqlMock.mockResolvedValue([{ id: "wordle" }]); // permissive for game check
+    const mk = () => new Request("http://localhost/api/entries", {
+      method: "POST",
+      headers: { authorization: "Bearer tok" },
+      body: JSON.stringify({ rawInput: "x" }),
+    });
+    let last = 200;
+    for (let i = 0; i < 31; i++) last = (await POST(mk())).status;
+    expect(last).toBe(429);
   });
 
   it("entries_active_uq collapses NULL variants via COALESCE so they collide in the index", () => {

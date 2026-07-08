@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { sql } from "@/db/client";
-import { requireUser } from "@/lib/membership";
+import { requireUserOrImportToken } from "@/lib/membership";
+import { rateLimit } from "@/lib/rateLimit";
 import { newId } from "@/lib/ids";
 import { localDateInTz } from "@/lib/day";
 import { PLATFORM_TZ } from "@/lib/group";
@@ -56,14 +57,21 @@ async function supersedeAndInsert(
 }
 
 /**
- * Attributes the entry to the SESSION's user — never to a client-supplied
- * id. `requireUser` re-resolves identity from the DB on every call, so an
- * unauthenticated caller (401) never reaches the insert below.
+ * Attributes the entry to the SESSION's (or import token's) user — never to a
+ * client-supplied id. `requireUserOrImportToken` re-resolves identity from the
+ * DB on every call, so an unauthenticated caller (401) never reaches the
+ * insert below.
  */
 export async function POST(req: Request) {
-  const guard = await requireUser();
+  const guard = await requireUserOrImportToken(req);
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
   const userId = guard.viewer.userId;
+
+  // Best-effort speed-bump for the token path only. In-memory/per-instance —
+  // NOT hard protection; blast radius is low (write-only, per-day supersede).
+  if (req.headers.get("authorization") && !rateLimit(`import:${userId}`, 30, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many imports — try again shortly" }, { status: 429 });
+  }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
