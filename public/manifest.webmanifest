@@ -5,10 +5,10 @@
   "share_target": {
     "action": "/share-target",
     "method": "GET",
-    "enctype": "application/x-www-form-urlencoded",
     "params": { "title": "title", "text": "text", "url": "url" }
   },
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#fffdf7",
   "theme_color": "#10756a",
