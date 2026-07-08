@@ -1,8 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import { detectPlatform } from "@/lib/platform";
-import { getMe, mintImportToken } from "@/lib/api";
-import { formatResult } from "@/lib/formatResult";
+import { mintImportToken } from "@/lib/api";
+import { Copy } from "@/design/icons";
 import styles from "./page.module.css";
 
 // The shared "Start Bragging" shortcut. Public + stable (the per-user key is an
@@ -24,7 +24,10 @@ function CopyKey(): JSX.Element {
   }
   return (
     <div className={styles.step}>
-      <button type="button" className={styles.btn} onClick={onCopy}>Copy your key</button>
+      <button type="button" className={styles.btnSecondary} onClick={onCopy}>
+        <Copy size={16} />
+        Copy your key
+      </button>
       {copied && <span className={styles.ok}>Copied — paste it into the shortcut when it asks.</span>}
       {error && <span className={styles.err}>{error}</span>}
     </div>
@@ -34,12 +37,13 @@ function CopyKey(): JSX.Element {
 function IosSteps(): JSX.Element {
   return (
     <ol className={styles.steps}>
+      <li><CopyKey /><span className={styles.muted}>You&apos;ll paste this into the shortcut in the next step.</span></li>
       <li>
         {SHORTCUT_URL
           ? <a className={styles.btn} href={SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Add the Bragboard shortcut</a>
           : <span className={styles.muted}>iPhone setup is coming soon.</span>}
+        <span className={styles.muted}>When it&apos;s added, it asks <b>&quot;Paste your Bragboard key&quot;</b> — paste it there.</span>
       </li>
-      <li><CopyKey /><span className={styles.muted}>When you add the shortcut, it asks <b>&quot;Paste your Bragboard key&quot;</b> — paste it there. (Confirmed: the shortcut uses an iOS Import Question, so there&apos;s no editing.)</span></li>
       <li><span className={styles.muted}>Tap <b>Allow</b> the first time the shortcut runs.</span></li>
       <li><span className={styles.muted}>In a game&apos;s Share sheet, if you don&apos;t see <b>Start Bragging</b>, tap <b>More</b> and turn it on once.</span></li>
     </ol>
@@ -64,28 +68,6 @@ function AndroidSteps(): JSX.Element {
   );
 }
 
-function CheckIt(): JSX.Element {
-  const [result, setResult] = useState<string | null>(null);
-  const [checked, setChecked] = useState(false);
-  async function onCheck() {
-    setChecked(true);
-    const res = await getMe(""); // session-scoped; returns the viewer's own recent list
-    if (res.ok && res.data.recent.length > 0) {
-      const r = res.data.recent[0];
-      setResult(`✓ We see it: ${r.gameId} ${formatResult(r.gameId, r.value, r.solved, r.detail)}`);
-    } else {
-      setResult(null);
-    }
-  }
-  return (
-    <div className={styles.step}>
-      <button type="button" className={styles.btn} onClick={onCheck}>Check that it worked</button>
-      {checked && (result ? <span className={styles.ok}>{result}</span>
-        : <span className={styles.muted}>Nothing yet — share a result from a game, then check again.</span>)}
-    </div>
-  );
-}
-
 export default function Setup(): JSX.Element {
   const platform = detectPlatform();
   return (
@@ -95,7 +77,6 @@ export default function Setup(): JSX.Element {
       {platform === "ios" && <IosSteps />}
       {platform === "android" && <AndroidSteps />}
       {platform === "other" && <p className={styles.muted}>Auto-log is a phone feature — open Bragboard on your phone to set it up.</p>}
-      <CheckIt />
     </div>
   );
 }
