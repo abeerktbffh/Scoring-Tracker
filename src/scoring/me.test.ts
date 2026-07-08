@@ -16,6 +16,16 @@ describe("computeMe", () => {
     expect(r.recent).toHaveLength(10);
     expect(r.recent[0].puzzleDate).toBe("2026-06-12");
   });
+
+  it("orders recent by created_at (most recently logged first) among same-day entries", () => {
+    // Two games logged the SAME puzzle day; the one logged later must come first.
+    const r = computeMe({ today: "2026-07-08", games, entries: [
+      { gameId: "connections", variant: null, puzzleDate: "2026-07-08", value: 1, solved: true, direction: "lower_better", createdAt: "2026-07-08T09:00:00Z" },
+      { gameId: "wordle", variant: null, puzzleDate: "2026-07-08", value: 3, solved: true, direction: "lower_better", createdAt: "2026-07-08T10:30:00Z" },
+    ] });
+    expect(r.recent[0].gameId).toBe("wordle"); // logged later → first, despite same puzzle date
+    expect(r.recent[1].gameId).toBe("connections");
+  });
   it("passes detail through to the recent list", () => {
     const result = computeMe({
       today: "2026-07-06",
