@@ -224,7 +224,7 @@ function IosSteps(): JSX.Element {
       </li>
       <li><CopyKey /><span className={styles.muted}>Paste your key when the shortcut asks for it.</span></li>
       <li><span className={styles.muted}>Tap <b>Allow</b> the first time the shortcut runs.</span></li>
-      <li><span className={styles.muted}>In a game's Share sheet, if you don't see Bragboard, tap <b>More</b> and turn it on once.</span></li>
+      <li><span className={styles.muted}>In a game's Share sheet, if you don't see <b>Start Bragging</b>, tap <b>More</b> and turn it on once.</span></li>
     </ol>
   );
 }
@@ -414,7 +414,7 @@ The screen degrades gracefully if the env var is set after deploy — so code ca
 
 Build once in the iOS **Shortcuts** app, then Share → **Copy iCloud Link** and send it to wire into `NEXT_PUBLIC_IOS_SHORTCUT_URL`.
 
-1. New Shortcut → name it **"Log to Bragboard"**.
+1. New Shortcut → name it **"Start Bragging"** (this is the label friends see + tap in their share sheet — owner-chosen).
 2. In shortcut settings, enable **Show in Share Sheet**; set **Accept** = *Text* (and *URLs*, *Safari web pages* to be safe).
 3. Add a **Text** action containing your key placeholder, OR use an **Import Question**: add a **Comment**/**Ask for Input** or set a shortcut **Import Question** prompting *"Enter your Bragboard key"* and store it in a variable `Key`. (Import questions prompt each person once when they add the shortcut.)
 4. Add **Get Contents of URL**:
