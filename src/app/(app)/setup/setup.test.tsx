@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 
 const mintMock = vi.fn();
-vi.mock("@/lib/api", () => ({ mintImportToken: mintMock, getMe: vi.fn() }));
+vi.mock("@/lib/api", () => ({ mintImportToken: mintMock }));
 vi.mock("@/lib/platform", () => ({ detectPlatform: () => "ios" }));
 
 const { default: Setup } = await import("./page");
@@ -16,11 +16,16 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("/setup (iOS)", () => {
-  it("shows the iPhone steps: add shortcut + copy key", () => {
+  it("shows the iPhone steps: copy key appears before add shortcut in DOM order", () => {
     process.env.NEXT_PUBLIC_IOS_SHORTCUT_URL = "https://www.icloud.com/shortcuts/abc";
     render(<Setup />);
-    expect(screen.getByText(/add the bragboard shortcut/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /copy your key/i })).toBeTruthy();
+    const copyKeyBtn = screen.getByRole("button", { name: /copy your key/i });
+    const addShortcutLink = screen.getByText(/add the bragboard shortcut/i);
+    expect(copyKeyBtn).toBeTruthy();
+    expect(addShortcutLink).toBeTruthy();
+    // Copy your key must come before Add the shortcut in DOM order.
+    const position = copyKeyBtn.compareDocumentPosition(addShortcutLink);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("Copy your key mints a token and copies it to the clipboard", async () => {
@@ -37,15 +42,6 @@ describe("/setup (iOS)", () => {
     render(<Setup />);
     const link = screen.getByRole("link", { name: /add the bragboard shortcut/i });
     expect(link.getAttribute("href")).toContain("icloud.com/shortcuts/");
-  });
-
-  it("Check that it worked shows the latest logged result", async () => {
-    process.env.NEXT_PUBLIC_IOS_SHORTCUT_URL = "https://www.icloud.com/shortcuts/abc";
-    const { getMe } = await import("@/lib/api");
-    (getMe as any).mockResolvedValue({ ok: true, data: { displayName: "Dev", recent: [{ gameId: "wordle", value: 4, solved: true, detail: null, puzzleDate: "2026-07-08" }] } });
-    render(<Setup />);
-    fireEvent.click(screen.getByRole("button", { name: /check that it worked/i }));
-    expect(await screen.findByText(/wordle/i)).toBeTruthy();
   });
 });
 
