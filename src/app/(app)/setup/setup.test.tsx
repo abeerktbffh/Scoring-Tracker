@@ -39,3 +39,20 @@ describe("/setup (iOS)", () => {
     expect(link.getAttribute("href")).toContain("icloud.com/shortcuts/");
   });
 });
+
+describe("/setup (Android)", () => {
+  it("shows an Install app button and triggers a captured install prompt", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/platform", () => ({ detectPlatform: () => "android" }));
+    const { default: SetupA } = await import("./page");
+    render(<SetupA />);
+    const promptFn = vi.fn().mockResolvedValue(undefined);
+    // Simulate Chrome firing beforeinstallprompt
+    const evt: any = new Event("beforeinstallprompt");
+    evt.prompt = promptFn;
+    window.dispatchEvent(evt);
+    const btn = await screen.findByRole("button", { name: /install app/i });
+    fireEvent.click(btn);
+    await waitFor(() => expect(promptFn).toHaveBeenCalled());
+  });
+});

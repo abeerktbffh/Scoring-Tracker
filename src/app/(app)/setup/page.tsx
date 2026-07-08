@@ -45,6 +45,24 @@ function IosSteps(): JSX.Element {
   );
 }
 
+function AndroidSteps(): JSX.Element {
+  const [deferred, setDeferred] = useState<any>(null);
+  React.useEffect(() => {
+    const onBIP = (e: any) => { e.preventDefault?.(); setDeferred(e); };
+    window.addEventListener("beforeinstallprompt", onBIP);
+    return () => window.removeEventListener("beforeinstallprompt", onBIP);
+  }, []);
+  return (
+    <ol className={styles.steps}>
+      <li>
+        <button type="button" className={styles.btn} onClick={() => deferred?.prompt?.()}>Install app</button>
+        <span className={styles.muted}>{deferred ? "Then reopen Bragboard from your home screen." : "If nothing happens, use Chrome's menu → Install app."}</span>
+      </li>
+      <li><span className={styles.muted}>Once installed, tap a game&apos;s <b>Share</b> and choose Bragboard.</span></li>
+    </ol>
+  );
+}
+
 export default function Setup(): JSX.Element {
   const platform = detectPlatform();
   return (
@@ -52,7 +70,7 @@ export default function Setup(): JSX.Element {
       <h1 className={styles.h1}>Set up auto-log</h1>
       <p className={styles.lede}>Log a result by tapping <b>Share</b> in a game and choosing Bragboard — no more copy-paste.</p>
       {platform === "ios" && <IosSteps />}
-      {platform === "android" && <p className={styles.muted}>Android setup loads here.{/* Task 3 */}</p>}
+      {platform === "android" && <AndroidSteps />}
       {platform === "other" && <p className={styles.muted}>Auto-log is a phone feature — open Bragboard on your phone to set it up.</p>}
     </div>
   );
