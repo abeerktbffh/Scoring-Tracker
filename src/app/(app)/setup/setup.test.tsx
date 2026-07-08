@@ -38,6 +38,15 @@ describe("/setup (iOS)", () => {
     const link = screen.getByRole("link", { name: /add the bragboard shortcut/i });
     expect(link.getAttribute("href")).toContain("icloud.com/shortcuts/");
   });
+
+  it("Check that it worked shows the latest logged result", async () => {
+    process.env.NEXT_PUBLIC_IOS_SHORTCUT_URL = "https://www.icloud.com/shortcuts/abc";
+    const { getMe } = await import("@/lib/api");
+    (getMe as any).mockResolvedValue({ ok: true, data: { displayName: "Dev", recent: [{ gameId: "wordle", value: 4, solved: true, detail: null, puzzleDate: "2026-07-08" }] } });
+    render(<Setup />);
+    fireEvent.click(screen.getByRole("button", { name: /check that it worked/i }));
+    expect(await screen.findByText(/wordle/i)).toBeTruthy();
+  });
 });
 
 describe("/setup (Android)", () => {

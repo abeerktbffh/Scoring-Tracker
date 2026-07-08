@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import { detectPlatform } from "@/lib/platform";
-import { mintImportToken } from "@/lib/api";
+import { getMe, mintImportToken } from "@/lib/api";
+import { formatResult } from "@/lib/formatResult";
 import styles from "./page.module.css";
 
 // The shared "Start Bragging" shortcut. Public + stable (the per-user key is an
@@ -63,6 +64,28 @@ function AndroidSteps(): JSX.Element {
   );
 }
 
+function CheckIt(): JSX.Element {
+  const [result, setResult] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
+  async function onCheck() {
+    setChecked(true);
+    const res = await getMe(""); // session-scoped; returns the viewer's own recent list
+    if (res.ok && res.data.recent.length > 0) {
+      const r = res.data.recent[0];
+      setResult(`✓ We see it: ${r.gameId} ${formatResult(r.gameId, r.value, r.solved, r.detail)}`);
+    } else {
+      setResult(null);
+    }
+  }
+  return (
+    <div className={styles.step}>
+      <button type="button" className={styles.btn} onClick={onCheck}>Check that it worked</button>
+      {checked && (result ? <span className={styles.ok}>{result}</span>
+        : <span className={styles.muted}>Nothing yet — share a result from a game, then check again.</span>)}
+    </div>
+  );
+}
+
 export default function Setup(): JSX.Element {
   const platform = detectPlatform();
   return (
@@ -72,6 +95,7 @@ export default function Setup(): JSX.Element {
       {platform === "ios" && <IosSteps />}
       {platform === "android" && <AndroidSteps />}
       {platform === "other" && <p className={styles.muted}>Auto-log is a phone feature — open Bragboard on your phone to set it up.</p>}
+      <CheckIt />
     </div>
   );
 }
