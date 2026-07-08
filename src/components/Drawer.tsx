@@ -39,6 +39,12 @@ export function Drawer({ open, onClose, theme, setTheme, isSuperAdmin }: DrawerP
         )}
 
         <div className={styles.section}>
+          <Link href="/setup" className={styles.item} onClick={onClose}>
+            Set up auto-log
+          </Link>
+        </div>
+
+        <div className={styles.section}>
           <p className={styles.heading}>Settings</p>
           <button
             type="button"
