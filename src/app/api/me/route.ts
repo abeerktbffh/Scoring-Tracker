@@ -48,7 +48,7 @@ export async function GET(req: Request) {
   const entryRows = (groupId
     ? await sql`
         SELECT e.game_id, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
-               g.metric_direction, e.detail
+               g.metric_direction, e.detail, e.created_at::text AS created_at
         FROM entries e
         JOIN games g ON g.id = e.game_id
         WHERE e.user_id = ${viewerUserId} AND e.superseded_by IS NULL AND e.is_late = false
@@ -61,7 +61,7 @@ export async function GET(req: Request) {
       `
     : await sql`
         SELECT e.game_id, e.variant, e.puzzle_date::text AS puzzle_date, e.parsed_value, e.solved,
-               g.metric_direction, e.detail
+               g.metric_direction, e.detail, e.created_at::text AS created_at
         FROM entries e
         JOIN games g ON g.id = e.game_id
         WHERE e.user_id = ${viewerUserId} AND e.superseded_by IS NULL AND e.is_late = false
@@ -74,6 +74,7 @@ export async function GET(req: Request) {
     solved: boolean;
     metric_direction: "lower_better" | "higher_better";
     detail: ResultDetail | null;
+    created_at: string;
   }[];
 
   const games = gameRows.map((g) => ({ id: g.id, name: g.name }));
@@ -85,6 +86,7 @@ export async function GET(req: Request) {
     solved: e.solved,
     direction: e.metric_direction,
     detail: e.detail ?? null,
+    createdAt: e.created_at,
   }));
 
   const result = computeMe({ today, games, entries });

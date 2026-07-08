@@ -9,6 +9,8 @@ export interface MeEntry {
   solved: boolean;
   direction: "lower_better" | "higher_better";
   detail?: ResultDetail | null;
+  /** When the entry was logged (ISO). Drives "recent" order — newest logged first. */
+  createdAt?: string;
 }
 
 export interface MeGame {
@@ -89,8 +91,16 @@ export function computeMe(input: MeInput): MeResult {
   });
 
   const nameById = new Map(games.map((g) => [g.id, g.name]));
+  // "Recent" = most recently LOGGED first (by created_at); fall back to
+  // puzzle_date when created_at is absent. Sorting by puzzle_date alone left
+  // same-day entries in an arbitrary order, so "your latest" was unreliable.
   const recent = [...entries]
-    .sort((a, b) => (a.puzzleDate < b.puzzleDate ? 1 : a.puzzleDate > b.puzzleDate ? -1 : 0))
+    .sort((a, b) => {
+      const ax = a.createdAt ?? "";
+      const bx = b.createdAt ?? "";
+      if (ax !== bx) return ax < bx ? 1 : -1;
+      return a.puzzleDate < b.puzzleDate ? 1 : a.puzzleDate > b.puzzleDate ? -1 : 0;
+    })
     .slice(0, 10)
     .map((e) => ({
       gameId: e.gameId,
