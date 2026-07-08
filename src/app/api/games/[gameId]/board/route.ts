@@ -148,8 +148,6 @@ export async function GET(
     silver: s.silver,
     bronze: s.bronze,
     gamesPlayed: s.gamesPlayed,
-    pb: s.pb,
-    pbFormatted: s.pb === null ? null : formatResult(gameId, s.pb, true, null),
   }));
   return NextResponse.json({ gameId, window, mode: "aggregate", locked: false, players, viewerName });
 }

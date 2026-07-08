@@ -60,7 +60,7 @@ describe("Segmented", () => {
 
 describe("LeaderboardTable", () => {
   it("highlights the row matching me with the self-highlight class", () => {
-    const { container } = render(<LeaderboardTable rows={rows} me="You" />);
+    const { container } = render(<LeaderboardTable rows={rows} me="You" leads="names" />);
 
     const youRow = screen.getByText("You").closest("tr");
     expect(youRow).toBeTruthy();
@@ -72,7 +72,7 @@ describe("LeaderboardTable", () => {
   });
 
   it("shows the crown icon on the rank-1 row", () => {
-    render(<LeaderboardTable rows={rows} me="You" />);
+    render(<LeaderboardTable rows={rows} me="You" leads="names" />);
 
     const djRow = screen.getByText("DJ").closest("tr");
     expect(djRow?.querySelector("svg")).toBeTruthy();
@@ -82,7 +82,7 @@ describe("LeaderboardTable", () => {
   });
 
   it("renders rank, gold, silver, bronze, and played columns", () => {
-    render(<LeaderboardTable rows={rows} me="You" />);
+    render(<LeaderboardTable rows={rows} me="You" leads="names" />);
 
     const djRow = screen.getByText("DJ").closest("tr");
     expect(djRow?.textContent).toContain("1");
@@ -98,6 +98,7 @@ describe("LeaderboardTable viewerRow", () => {
       <LeaderboardTable
         rows={top}
         me="Yuhnvee"
+        leads="names"
         viewerRow={{
           row: { displayName: "Yuhnvee", gold: 0, silver: 0, bronze: 2, gamesPlayed: 5, gamesLed: [] },
           rank: 10,

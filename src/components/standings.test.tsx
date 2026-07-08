@@ -17,7 +17,7 @@ const ub = vi.mocked(useBoard);
 
 const games: Game[] = [{ id: "wordle", name: "Wordle", type: "outcome", metricDirection: "lower_better", hasVariants: false }];
 const overall: OverallRow[] = [{ displayName: "DJ", gold: 3, silver: 1, bronze: 0, gamesPlayed: 10, gamesLed: ["wordle"] }];
-const medalRows: MedalBoardRow[] = [{ displayName: "DJ", gold: 2, silver: 0, bronze: 1, gamesPlayed: 5, pb: 2, pbFormatted: "2/6 ✓" }];
+const medalRows: MedalBoardRow[] = [{ displayName: "DJ", gold: 2, silver: 0, bronze: 1, gamesPlayed: 5 }];
 const contestRows: DailyContestRow[] = [
   { displayName: "DJ", value: 2, valueFormatted: "2/6 ✓", solved: true, medal: "gold", detail: null, variant: null },
 ];
@@ -52,7 +52,7 @@ describe("Standings board screen", () => {
     expect(screen.getByText(/🥇/)).toBeTruthy();
   });
 
-  it("an aggregate window shows a flat medal board (no expandable rows) with PB in units", async () => {
+  it("an aggregate window shows a flat medal board (no expandable rows, no PB column)", async () => {
     bd.mockResolvedValue({ ok: true, data: { gameId: "wordle", window: "weekly", mode: "aggregate", locked: false, players: medalRows, viewerName: "DJ" } });
     render(<Standings />);
     await waitFor(() => expect(screen.getAllByText("DJ").length).toBeGreaterThan(0));
@@ -60,7 +60,9 @@ describe("Standings board screen", () => {
     fireEvent.click(screen.getByRole("button", { name: /game/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Wordle$/ }));
 
-    await waitFor(() => expect(screen.getByText("2/6 ✓")).toBeTruthy()); // PB formatted
+    await waitFor(() => expect(screen.getByText("5")).toBeTruthy()); // gamesPlayed
+    // No PB column/header anywhere on the aggregate board
+    expect(screen.queryByText("PB")).toBeNull();
     // No expand chevrons on aggregate rows
     expect(screen.queryByRole("button", { name: /expand|details/i })).toBeNull();
   });

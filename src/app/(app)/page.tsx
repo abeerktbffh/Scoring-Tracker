@@ -159,7 +159,7 @@ function HomeReady({ me, rows, onLog, isGroup }: HomeReadyProps): JSX.Element {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>This week</h2>
         <Card>
-          <LeaderboardTable rows={snapshot} me={name ?? undefined} viewerRow={viewerRow} />
+          <LeaderboardTable rows={snapshot} me={name ?? undefined} viewerRow={viewerRow} leads="count" />
         </Card>
       </section>
     </>
