@@ -1,4 +1,5 @@
 import { sql } from "@/db/client";
+import { hashImportToken } from "@/lib/importToken";
 
 export type Viewer = {
   userId: string;
@@ -63,6 +64,35 @@ export async function requireUser(): Promise<GuardResult> {
 /** Guard for platform-owner-only routes (catalog management, admin panel). */
 export async function requireSuperAdmin(): Promise<GuardResult> {
   return toGuardResult(await resolveViewer(), "super-admin");
+}
+
+/**
+ * Resolves a viewer from a raw import token by its hash. DB is the source of
+ * truth (name/super-admin read fresh), exactly like `resolveViewer`. Returns
+ * null when the token matches no user.
+ */
+export async function resolveViewerByImportToken(token: string): Promise<Viewer | null> {
+  const hash = hashImportToken(token);
+  const rows = (await sql`
+    SELECT id, display_name, is_super_admin FROM users WHERE import_token_hash = ${hash}
+  `) as { id: string; display_name: string | null; is_super_admin: boolean }[];
+  const row = rows[0];
+  if (!row) return null;
+  return { userId: row.id, displayName: row.display_name ?? null, isSuperAdmin: row.is_super_admin ?? false };
+}
+
+const BEARER_RE = /^Bearer\s+(\S+)$/i;
+
+/**
+ * Guard for endpoints reachable by either a browser session OR a per-user
+ * import token. An `Authorization: Bearer <token>` header is resolved via the
+ * token (unknown token → 401, never a silent session fallthrough); with no
+ * bearer header it delegates to the session guard `requireUser()`.
+ */
+export async function requireUserOrImportToken(req: Request): Promise<GuardResult> {
+  const m = req.headers.get("authorization")?.match(BEARER_RE);
+  if (m) return toGuardResult(await resolveViewerByImportToken(m[1]), "user");
+  return requireUser();
 }
 
 /** Pure decision function — no I/O — exhaustively unit-testable. */

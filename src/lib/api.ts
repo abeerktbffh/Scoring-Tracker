@@ -196,7 +196,12 @@ export function getMe(player: string, group?: string): Promise<ApiResult<MeRespo
 
 export function postEntry(
   body: EntryInput
-): Promise<ApiResult<{ ok: true; parsed: { gameId: string; value: number; [key: string]: unknown } }>> {
+): Promise<
+  ApiResult<{
+    ok: true;
+    parsed: { gameId: string; value: number; solved: boolean; detail: ResultDetail | null };
+  }>
+> {
   return request("/api/entries", jsonPost(body));
 }
 

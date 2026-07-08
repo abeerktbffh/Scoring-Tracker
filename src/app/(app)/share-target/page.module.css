@@ -1,0 +1,12 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.msg { color: var(--muted); font-family: var(--font-ui); }
+.ok { color: var(--accent); font-family: var(--font-display); font-size: 20px; }
+.err { color: var(--danger); font-family: var(--font-ui); }
+.link { color: var(--accent); font-family: var(--font-ui); font-weight: 600; }

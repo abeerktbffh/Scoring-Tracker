@@ -111,3 +111,9 @@ ALTER TABLE groups ADD COLUMN IF NOT EXISTS invite_token TEXT;
 -- that fail to re-parse keep detail = NULL and fall back to scalar display.
 ALTER TABLE entries ADD COLUMN IF NOT EXISTS detail JSONB;
 
+-- === Auto-import: per-user import token (hash-only, write-capable bearer credential) ===
+-- Stores ONLY the SHA-256 hash of the token. Plaintext is returned once at
+-- generation and never persisted. Unique so a token resolves to at most one user.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS import_token_hash TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_import_token_hash_uq ON users (import_token_hash) WHERE import_token_hash IS NOT NULL;
+
