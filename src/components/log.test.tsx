@@ -69,7 +69,7 @@ describe("Log", () => {
   it("pastes text and submits, calling postEntry with only rawInput; clears + confirms on success", async () => {
     mockedPostEntry.mockResolvedValue({
       ok: true,
-      data: { ok: true, parsed: { gameId: "wordle", value: 3 } },
+      data: { ok: true, parsed: { gameId: "wordle", value: 3, solved: true, detail: null } },
     });
 
     render(<Log />);
@@ -113,7 +113,7 @@ describe("Log", () => {
   it("manual mode: picking a game then submitting calls postEntry with only gameId/value/solved", async () => {
     mockedPostEntry.mockResolvedValue({
       ok: true,
-      data: { ok: true, parsed: { gameId: "wordle", value: 4 } },
+      data: { ok: true, parsed: { gameId: "wordle", value: 4, solved: true, detail: null } },
     });
 
     render(<Log />);
