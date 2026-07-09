@@ -19,7 +19,7 @@ Same-day comparisons only ever compare the **same puzzle**. An entry is filed on
 Every parser-backed game carries its true date:
 - **Numbered games (12)** — `puzzle_date − puzzle_number` is a single consistent per-game "epoch" across all correctly-filed data (the only outliers were the mis-filed rows). So `true_date = epoch[gameId] + puzzle_number`.
 - **India Mini** — no number, but the share **URL embeds the date**: `indiamini.in/play/?id=al-crossword-mini-YYYYMMDD`.
-- **Minute Cryptic** — no number, but the share **text begins with the date**: `Minute Cryptic - D Month, YYYY`.
+- **Minute Cryptic** — no number, but the share **text begins with the date**: `Minute Cryptic - D Month, YYYY` (e.g. `1 July, 2026`). Parse it with a **static month-name→index lookup + direct field extraction** — NOT `new Date(str)` (which is timezone-fragile and only works because the runtime is UTC).
 - **Fallback** — hand-typed/manual entries (no share text) have no identifier → keep log-date. This is a temporary case: manual entry is slated for removal, after which every entry is parsed and gets a true date.
 
 Per-game epochs, seeded from current data (`puzzle_date − puzzle_number`; implementation re-derives/verifies these against prod before hardcoding):
@@ -41,6 +41,8 @@ Per-game epochs, seeded from current data (`puzzle_date − puzzle_number`; impl
 
 (`true_date = epoch + puzzle_number` days. Assumes strictly-daily numbering, which the data confirms across the observed range for every game.)
 
+**Epoch re-derivation is a hard gate (not a note):** because a wrong epoch silently mis-files *every* entry for that game (no unique-index collision to catch it), the implementation MUST compute each epoch as the **mode of `(puzzle_date − puzzle_number)` over correctly-filed active rows** and **assert every such row agrees** with the mode (excluding the 9 known mis-files). If any game's offset isn't unanimous, stop and investigate — do not hardcode a guessed value. The values in the table above are the seed to verify against, not to trust blindly.
+
 ## Design
 
 ### 1. Parse contract
@@ -51,35 +53,40 @@ Add an optional `puzzleDate?: string | null` (ISO `YYYY-MM-DD`) to `ParseResult`
 ### 2. Date-resolution helper (pure, central)
 New `src/lib/puzzleDate.ts`:
 - `PUZZLE_EPOCH: Record<string, string>` — the table above.
-- `resolvePuzzleDate({ gameId, puzzleNumber, parsedDate }, today): { puzzleDate: string; isLate: boolean }`
-  - Precedence: **`parsedDate`** (embedded) → **`epoch[gameId] + puzzleNumber`** (when both exist) → **`today`** (fallback).
-  - `isLate = puzzleDate < today` (a catch-up log of a past puzzle).
-Pure and exhaustively unit-testable.
+- `resolvePuzzleDate({ gameId, puzzleNumber, parsedDate }, today): string` — returns the puzzle's true date.
+  - Precedence: **`parsedDate`** (embedded date the parser extracted) → **`epoch[gameId] + puzzleNumber`** (when both exist) → **`today`** (fallback for hand-typed / no identifier).
+- **Missing-epoch guard:** if `puzzleNumber != null` but `gameId` is NOT in `PUZZLE_EPOCH` (a new numbered game shipped without an epoch), the helper falls back to `today` AND the caller emits the same drift signal used for parser drift today (`console.warn("[epoch-missing]", gameId)` + `Sentry.captureMessage`, mirroring `entries/route.ts`'s `[parse-failure]` handling). This prevents a silent regression to log-date bucketing.
+Pure and exhaustively unit-testable (the date computation; the warn lives in the caller).
 
 ### 3. Write path
-`POST /api/entries` uses `resolvePuzzleDate(...)` to set BOTH `puzzle_date` (replacing the current `localDateInTz` line) and `is_late` (replacing the hardcoded `false`). Nothing else in `supersedeAndInsert` changes: dedup/supersede still key on `(user_id, game_id, puzzle_date, variant)` — now with the *true* date, so a per-day supersede is per-*puzzle*.
+`POST /api/entries` sets `puzzle_date = resolvePuzzleDate(...)` (replacing the current `localDateInTz` line). `is_late` stays `false` (unchanged — see §4). `supersedeAndInsert` is otherwise untouched: dedup/supersede still key on `(user_id, game_id, puzzle_date, variant)` — now with the *true* date, so a per-day supersede is per-*puzzle*.
 
-### 4. Everything downstream is unchanged
-Grouping (`gameId|puzzle_date`), Today/Week/Month/All-time windows, and streaks all key on `puzzle_date`, which is now correct — so they work without modification. `is_late` entries are **excluded from win/medal tallies** (this is the existing, until-now-dormant `is_late` behavior) but are still stored and shown on their true day. **Behavior (owner-approved):** a late/catch-up log lands on its correct day but does not count toward standings.
+**Threading `puzzleDate`:** add `puzzleDate: string | null` to `ResolvedSubmission` (`src/lib/submission.ts`) and set it in BOTH branches of `resolveSubmission` — paste mode carries `parsed.puzzleDate` through the spread; manual mode sets `null` (no share text). The route reads `resolved.puzzleDate` (and `resolved.puzzleNumber`) into `resolvePuzzleDate`.
+
+### 4. Catch-up logs count normally (owner-approved) — no `is_late` mechanic
+A catch-up log lands on its correct day (via §1) and **competes normally on that day**, like any result. We do NOT set `is_late = true` — it stays `false` as it is today. The existing `is_late = false` filters in the read paths (`leaderboard`/`board`/`me` routes) therefore remain harmless no-ops and are **left untouched**. (Accepted tradeoff: no guard against someone logging an old puzzle after seeing its answer/others' scores — acceptable for a casual friend group; keeps the design minimal.)
+
+### 4b. Everything downstream is unchanged
+Grouping (`gameId|puzzle_date`), Today/Week/Month/All-time windows, and streaks all key on `puzzle_date`, which is now correct — so they work without modification. The reported bug is fixed purely by the date being right.
 
 ### 5. One-time backfill
-`scripts/backfill-puzzle-dates.mjs` (new; deny-listed like other prod scripts): for each active entry, re-parse `raw_input` (reusing `detectAndParse`) → `resolvePuzzleDate` → if the computed `puzzle_date`/`is_late` differ from stored, `UPDATE` them. Only `puzzle_date` + `is_late` are written; never `parsed_value`/`solved`/`raw_input`/`detail`. `--dry-run` first (reports the changes — expected: the 9 identified rows + any is_late re-flags). Guard the rare unique-index collision (re-dating onto an occupied slot): report and skip such rows for manual review rather than clobbering. Rows without a re-parseable identifier keep their log-date.
+A thin `scripts/backfill-puzzle-dates.mjs` (new; deny-listed like other prod scripts) + a **pure, unit-tested `src/lib/backfillPuzzleDateVerify.ts`** module (mirrors the `backfill-detail.mjs` + `backfillDetailVerify.ts` convention). For each active entry, re-parse `raw_input` (reusing `detectAndParse`) → `resolvePuzzleDate` → if the computed `puzzle_date` differs from stored, `UPDATE` **only `puzzle_date`** (never `is_late`/`parsed_value`/`solved`/`raw_input`/`detail`). `--dry-run` first (reports the changes — expected: exactly the 9 identified rows). Collision guard: if re-dating a row would hit the `entries_active_uq` slot of an existing active row, **report and skip** that row for manual review rather than clobbering. Rows without a re-parseable identifier keep their log-date.
 
 ### 6. NYT Mini
-Deactivate it (`games.active = false`), consistent with how Framed was handled (reversible; its 1 entry retained). Removes the last numberless *active* game.
+Deactivate it: `UPDATE games SET active = false WHERE id = 'nyt-mini'` on prod (reversible; its 1 entry retained). Removes the last numberless *active* game. (Same reversible flip we applied to `framed` — note that's a prod-data fact from a prior session, not represented in source; confirm against the live `games` table when applying.)
 
 ## Testing
 
-- **`puzzleDate` helper** (pure): epoch+number math; embedded-date precedence; fallback to today; `isLate` boundary (true date = today → not late; < today → late).
-- **India Mini / Minute Cryptic parsers**: extract the embedded date from real sample share text.
-- **Write path**: files by true date; dedup/supersede on the true date; sets `is_late` correctly; fallback to today when no identifier.
-- **Backfill**: dry-run over a fixture set re-dates a mis-filed row and flags late; leaves correctly-filed rows untouched; collision rows are skipped, not clobbered.
+- **`resolvePuzzleDate` helper** (pure): epoch+number math (incl. date-add correctness, no off-by-one); embedded-date precedence over number; fallback to today when no identifier; missing-epoch → returns today (and the caller-warn path is covered where it lives).
+- **India Mini / Minute Cryptic parsers**: extract the embedded date from real sample share text (India Mini `…-YYYYMMDD`; Minute Cryptic `D Month, YYYY` via static month lookup — assert no `new Date` round-trip).
+- **Write path**: files by true date; dedup/supersede on the true date; fallback to today when no identifier; `is_late` stays `false`.
+- **`backfillPuzzleDateVerify` (pure module)**: given rows, computes which need re-dating and to what; leaves correctly-filed rows untouched; flags collisions to skip. Dry-run over a fixture set confirms it targets exactly the mis-filed rows.
 
 ## Rollout / deploy (gated — owner go-ahead)
 
 1. Backup tag + Neon PITR point.
 2. Deploy the code (parser contract + helper + write path + NYT Mini deactivation). No schema migration — `is_late`/`puzzle_number`/`puzzle_date` columns already exist.
-3. Run `backfill-puzzle-dates.mjs --dry-run` against prod, confirm it targets the 9 (+ any is_late re-flags), then apply.
+3. Run `backfill-puzzle-dates.mjs --dry-run` against prod, confirm it targets exactly the 9 mis-filed rows, then apply.
 4. Deactivate NYT Mini on prod (`active = false`).
 Nothing to prod without explicit go-ahead.
 
