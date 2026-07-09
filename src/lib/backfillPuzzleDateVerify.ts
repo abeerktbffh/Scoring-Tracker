@@ -11,9 +11,12 @@ export interface BackfillRow {
 }
 
 /**
- * Decides which rows to re-date to their true puzzle date. Pure. A row is
- * updated when its computed true date differs from the stored one. It is
- * skipped (never clobbered) when re-dating would land on the active slot
+ * Decides which rows to re-date to their true puzzle date. Pure. A row with
+ * no re-parseable identifier (resolvePuzzleDate falls back to `today`) is
+ * left untouched — a backfill must never fabricate a date from the arbitrary
+ * day the script happens to run on. Otherwise a row is updated when its
+ * computed true date differs from the stored one, and skipped (never
+ * clobbered) when re-dating would land on the active slot
  * (userId, gameId, variant, targetDate) of another row.
  */
 export function planPuzzleDateBackfill(
@@ -27,7 +30,9 @@ export function planPuzzleDateBackfill(
   const updates: { id: string; from: string; to: string }[] = [];
   const skips: { id: string; reason: string }[] = [];
   for (const r of rows) {
-    const to = resolvePuzzleDate({ gameId: r.gameId, puzzleNumber: r.puzzleNumber, parsedDate: r.parsedDate }, today).date;
+    const resolved = resolvePuzzleDate({ gameId: r.gameId, puzzleNumber: r.puzzleNumber, parsedDate: r.parsedDate }, today);
+    if (resolved.source === "fallback") continue;
+    const to = resolved.date;
     if (to === r.puzzleDate) continue;
     const target = slot(r.userId, r.gameId, r.variant, to);
     if (occupied.has(target)) {

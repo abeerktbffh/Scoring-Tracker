@@ -14,10 +14,12 @@
 import { neon } from "@neondatabase/serverless";
 import { detectAndParse } from "../src/parsers/registry";
 import { planPuzzleDateBackfill } from "../src/lib/backfillPuzzleDateVerify";
+import { localDateInTz } from "../src/lib/day";
+import { PLATFORM_TZ } from "../src/lib/group";
 
 const sql = neon(process.env.DATABASE_URL);
 const dryRun = process.argv.includes("--dry-run");
-const today = new Date().toISOString().slice(0, 10);
+const today = localDateInTz(PLATFORM_TZ);
 
 const entries = (await sql`
   SELECT id, user_id, game_id, variant, puzzle_date::text AS puzzle_date, raw_input
