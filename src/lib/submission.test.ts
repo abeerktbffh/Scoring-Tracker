@@ -5,7 +5,7 @@ describe("resolveSubmission", () => {
   it("paste mode: parses recognized share text", () => {
     const r = resolveSubmission({ rawInput: "Wordle 1,838 3/6" });
     expect(r).toEqual({
-      gameId: "wordle", puzzleNumber: 1838, variant: null,
+      gameId: "wordle", puzzleNumber: 1838, puzzleDate: null, variant: null,
       value: 3, solved: true, rawInput: "Wordle 1,838 3/6",
       detail: { guesses: 3, solved: true, hardMode: false, grid: [] },
     });
@@ -19,7 +19,7 @@ describe("resolveSubmission", () => {
     const r = resolveSubmission({ gameId: "nyt-mini", variant: null, value: 42, solved: true });
     expect(r).toEqual({
       gameId: "nyt-mini", variant: null, value: 42, solved: true,
-      puzzleNumber: null, rawInput: null,
+      puzzleNumber: null, puzzleDate: null, rawInput: null,
     });
   });
   it("manual mode: normalizes empty variant to null", () => {

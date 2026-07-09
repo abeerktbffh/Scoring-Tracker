@@ -18,6 +18,7 @@ describe("india mini parser", () => {
       value: 320,
       solved: true,
       detail: { seconds: 320 },
+      puzzleDate: "2026-07-02",
     });
   });
 
@@ -35,6 +36,15 @@ describe("india mini parser", () => {
 
   it("throws on non-India-Mini text", () => {
     expect(() => indiaMiniParser.parse("solved in 3 minutes somewhere else")).toThrow();
+  });
+
+  it("extracts the puzzle date from the share URL", () => {
+    const text = "I just solved this Crossword in 59 seconds.\nhttps://indiamini.in/play/?id=al-crossword-mini-20260706&set=";
+    expect(indiaMiniParser.parse(text).puzzleDate).toBe("2026-07-06");
+  });
+  it("leaves puzzleDate undefined when the URL has no date", () => {
+    const text = "I just solved this Crossword in 59 seconds.\nhttps://indiamini.in/play/";
+    expect(indiaMiniParser.parse(text).puzzleDate ?? null).toBeNull();
   });
 });
 

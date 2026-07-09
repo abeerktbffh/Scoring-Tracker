@@ -25,6 +25,9 @@ export const indiaMiniParser: Parser = {
       else if (secs) seconds = Number(secs[1]);
     }
     if (seconds === null) throw new Error("No time found in India Mini result");
+    // Date embedded in the share URL: al-crossword-mini-YYYYMMDD
+    const dm = text.match(/al-crossword-mini-(\d{4})(\d{2})(\d{2})/);
+    const puzzleDate = dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : null;
     return {
       gameId: "india-mini",
       puzzleNumber: null,
@@ -32,6 +35,7 @@ export const indiaMiniParser: Parser = {
       value: seconds,
       solved: true,
       detail: { seconds },
+      puzzleDate,
     };
   },
 };

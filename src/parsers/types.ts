@@ -35,6 +35,8 @@ export interface ParseResult {
   solved: boolean;
   /** Optional structured detail; display/analytics only. */
   detail?: ResultDetail | null;
+  /** The puzzle's true date (YYYY-MM-DD) when the parser can determine it directly (e.g. embedded in the share text). Optional; most games leave it undefined and are dated by puzzleNumber+epoch downstream. */
+  puzzleDate?: string | null;
 }
 
 export interface Parser {

@@ -37,6 +37,7 @@ const RESOLVED_SUBMISSION = {
   value: 4,
   solved: true,
   puzzleNumber: 999,
+  puzzleDate: null,
   rawInput: null,
 };
 
@@ -213,6 +214,24 @@ describe("POST /api/entries", () => {
     let last = 200;
     for (let i = 0; i < 31; i++) last = (await POST(mk())).status;
     expect(last).toBe(429);
+  });
+
+  it("files the entry on the puzzle's true date (number + epoch), not today", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    resolveSubmissionMock.mockReturnValue({ gameId: "pinpoint", variant: null, value: 1, solved: true, puzzleNumber: 798, puzzleDate: null, rawInput: "x" });
+    sqlMock.mockResolvedValueOnce([{ id: "pinpoint" }]).mockResolvedValueOnce([]).mockResolvedValueOnce(undefined);
+    await POST(jsonRequest({ rawInput: "x" }));
+    const insert = sqlMock.mock.calls.find((c) => String(c[0].join("")).includes("INSERT INTO entries"));
+    expect(insert!.slice(1)).toContain("2026-07-07"); // pinpoint #798 true date, regardless of "today"
+  });
+
+  it("uses an embedded parsedDate when present", async () => {
+    guardMock.mockResolvedValue(USER_VIEWER);
+    resolveSubmissionMock.mockReturnValue({ gameId: "india-mini", variant: null, value: 59, solved: true, puzzleNumber: null, puzzleDate: "2026-07-06", rawInput: "x" });
+    sqlMock.mockResolvedValueOnce([{ id: "india-mini" }]).mockResolvedValueOnce([]).mockResolvedValueOnce(undefined);
+    await POST(jsonRequest({ rawInput: "x" }));
+    const insert = sqlMock.mock.calls.find((c) => String(c[0].join("")).includes("INSERT INTO entries"));
+    expect(insert!.slice(1)).toContain("2026-07-06");
   });
 
   it("entries_active_uq collapses NULL variants via COALESCE so they collide in the index", () => {

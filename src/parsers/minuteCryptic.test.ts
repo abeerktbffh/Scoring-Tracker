@@ -20,6 +20,7 @@ describe("minute cryptic parser", () => {
       value: 0,
       solved: true,
       detail: { hints: 0, underPar: 3 },
+      puzzleDate: "2026-07-01",
     });
   });
   it("parses a non-zero hint count", () => {
@@ -31,6 +32,11 @@ describe("minute cryptic parser", () => {
   });
   it("throws on non-Minute-Cryptic text", () => {
     expect(() => minuteCrypticParser.parse("hello")).toThrow();
+  });
+
+  it("extracts the puzzle date from the header (static month lookup, no Date parsing)", () => {
+    const text = "Minute Cryptic - 6 July, 2026\n🏆 0 hints – 1 under the community par.";
+    expect(minuteCrypticParser.parse(text).puzzleDate).toBe("2026-07-06");
   });
 });
 

@@ -7,6 +7,7 @@ export interface ResolvedSubmission {
   value: number;
   solved: boolean;
   puzzleNumber: number | null;
+  puzzleDate: string | null;
   rawInput: string | null;
   detail?: ResultDetail | null;
 }
@@ -28,7 +29,7 @@ export function resolveSubmission(
   if (typeof b.rawInput === "string" && b.rawInput.length > 0) {
     const parsed = detect(b.rawInput);
     if (!parsed) return { error: "Could not parse result", status: 422 };
-    return { ...parsed, rawInput: b.rawInput };
+    return { ...parsed, puzzleDate: parsed.puzzleDate ?? null, rawInput: b.rawInput };
   }
 
   // Manual mode
@@ -43,6 +44,7 @@ export function resolveSubmission(
       value: b.value,
       solved: b.solved,
       puzzleNumber: null,
+      puzzleDate: null,
       rawInput: null,
     };
   }

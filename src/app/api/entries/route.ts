@@ -8,6 +8,7 @@ import { localDateInTz } from "@/lib/day";
 import { PLATFORM_TZ } from "@/lib/group";
 import { resolveSubmission, type ResolvedSubmission } from "@/lib/submission";
 import { isUniqueViolation } from "@/lib/dbError";
+import { resolvePuzzleDate } from "@/lib/puzzleDate";
 
 export const runtime = "nodejs";
 
@@ -98,7 +99,17 @@ export async function POST(req: Request) {
   `) as { id: string }[];
   if (!game[0]) return NextResponse.json({ error: "Unknown game" }, { status: 422 });
 
-  const puzzleDate = localDateInTz(PLATFORM_TZ);
+  const today = localDateInTz(PLATFORM_TZ);
+  const resolvedDate = resolvePuzzleDate(
+    { gameId: resolved.gameId, puzzleNumber: resolved.puzzleNumber, parsedDate: resolved.puzzleDate },
+    today,
+  );
+  if (resolvedDate.source === "fallback" && resolved.puzzleNumber != null) {
+    console.warn("[epoch-missing]", resolved.gameId);
+    Sentry.captureMessage("[epoch-missing] " + resolved.gameId, "warning");
+    await Sentry.flush(2000);
+  }
+  const puzzleDate = resolvedDate.date;
   await supersedeAndInsert(userId, resolved, puzzleDate);
 
   return NextResponse.json({ ok: true, parsed: resolved });
