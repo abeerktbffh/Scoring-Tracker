@@ -9,6 +9,8 @@ import {
 } from "./linkedin";
 import { strandsParser } from "./strands";
 import { indiaMiniParser } from "./indiaMini";
+import { hinduMiniParser } from "./hinduMini";
+import { easyDownParser } from "./easyDown";
 import { pinpointParser } from "./pinpoint";
 
 export const parsers: Parser[] = [
@@ -26,6 +28,8 @@ export const parsers: Parser[] = [
   pinpointParser,
   strandsParser,
   indiaMiniParser,
+  hinduMiniParser,
+  easyDownParser,
 ];
 
 export function detectAndParse(

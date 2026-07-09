@@ -16,6 +16,8 @@ export const RESULT_SHAPE: Record<string, ResultShape> = {
   tango: "timed",
   "mini-sudoku": "timed",
   "india-mini": "timed",
+  "hindu-mini": "timed",
+  "easy-down": "timed",
   zip: "timed",
   crossclimb: "timed",
   patches: "timed",
