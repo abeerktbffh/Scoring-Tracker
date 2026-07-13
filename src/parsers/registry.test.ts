@@ -38,3 +38,16 @@ describe("detectAndParse routes every known game", () => {
     expect(detectAndParse(text)?.gameId).toBe(expectedGameId);
   });
 });
+
+describe("detectAndParse routing — thehindu.com vs indiamini.in (no collision)", () => {
+  const cases: [string, string][] = [
+    ["I just solved this Crossword in 59 seconds https://indiamini.in/play/?id=al-crossword-mini-20260702", "india-mini"],
+    ["I just solved The Hindu Mini in 2 minutes and 51 seconds. https://www.thehindu.com/crosswords/thehindu-mini-crossword", "hindu-mini"],
+    ["I just solved this Crossword in 3 minutes and 7 seconds. https://www.thehindu.com/crosswords/hindu-one-down", "easy-down"],
+  ];
+  for (const [text, gameId] of cases) {
+    it(`routes to ${gameId}`, () => {
+      expect(detectAndParse(text)?.gameId).toBe(gameId);
+    });
+  }
+});
