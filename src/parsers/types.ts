@@ -17,7 +17,7 @@ export interface ResultDetail {
   hints?: number;
   theme?: string | null;    // Strands
   underPar?: number | null; // Minute Cryptic
-  // Timed (Queens/Tango/Mini Sudoku/India Mini/NYT Mini/Zip/Crossclimb/Patches/Wend/Pips)
+  // Timed (Queens/Tango/Mini Sudoku/India Mini/Hindu Mini/Easy Down/NYT Mini/Zip/Crossclimb/Patches/Wend/Pips)
   seconds?: number;
   backtracks?: number;      // Zip
   redraws?: number;         // Patches
