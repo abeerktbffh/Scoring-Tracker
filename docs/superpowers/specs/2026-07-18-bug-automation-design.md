@@ -24,7 +24,6 @@ Reading and writing the sheet unattended requires the **Google Sheets API** via 
 2. Create a service account, download a JSON key.
 3. Share the sheet with the service account's `client_email` as **Editor**.
 4. Store the key locally (path in `.env.local`, e.g. `GSHEETS_KEY_FILE=./.gsheets-key.json`); **gitignore the key** — never committed. Auth is a signed JWT → access token, then the Sheets REST API (no npm dependency needed; Node built-in `crypto`).
-5. **Scheduled wake:** set a macOS wake timer (`sudo pmset repeat wakeorpoweron MTWRFSU 06:55:00`) so the Mac is awake before the 07:00 IST run. The owner runs this `sudo` command themselves (it needs admin). Without it, a sleeping/closed laptop misses the run.
 
 Sheet coordinates (from [[bragboard-bug-tracker]]): id `1HSNw7eimmBMe-B5tSCSKEBHZCt1oaxW7`, tab `Tracker`, columns A=ID … F=Status … J=Resolved, K=Notes/Links. Status vocab: `Backlog / In Progress / In Review / Blocked / Done`.
 
@@ -75,9 +74,10 @@ When a candidate is under-specified, has multiple plausible readings, or can't b
 - Build attempted but not confidently completable (tests won't pass, fix unclear) → **`Blocked`** + `[auto-blocked …]` note with the drafted plan and the blocker (does **not** force a bad PR).
 - `Done` → owner-set after merge/deploy (the automation never sets `Done`).
 
-## Schedule & notification (owner-confirmed)
+## Trigger & notification (owner-confirmed)
 
-- **Schedule:** once daily at **07:00 IST**, triggered via a scheduled autonomous run (registered with the environment's cron mechanism), paired with the `pmset` scheduled-wake above so the Mac is awake to run it.
+- **Trigger:** a **Claude Code SessionStart hook** with a **once-per-day guard** — on the first session of the day it launches the review; later sessions that day do nothing. The guard reads the last-run date from the local state file (`.superpowers/bug-automation/state.json`). This matches "first time back at the machine" with **no** cron, `pmset`, or headless launcher.
+- **Background execution:** the run is launched in the **background** so it never hijacks the session the owner opened for other work; it pings the owner when draft PRs are ready.
 - **Per-day build cap:** **3** (safety ceiling; process highest-priority qualifying items first). Rarely binding on normal intake — it's a guard against a flood or a runaway, not a throttle. Raisable later.
 - **Notification:** the run (a) opens each draft PR (GitHub emails the owner) **and** (b) writes a one-line run summary into the sheet (a `Run Log` note/tab). Push notification is **off** by default (can be enabled later).
 
@@ -101,10 +101,10 @@ When a candidate is under-specified, has multiple plausible readings, or can't b
 1. **Autonomy:** build-to-draft-PR; merge/deploy always manual.
 2. **Access:** Google Sheets API service account (read + write).
 3. **Per-day build cap:** 3 (safety ceiling, highest-priority first).
-4. **Schedule:** 07:00 IST daily + macOS `pmset` scheduled-wake.
+4. **Trigger:** first Claude Code session of the day, via a SessionStart hook with a once-per-day guard, run in the background (no cron / `pmset` / headless launcher).
 5. **Notification:** draft PR + one-line sheet run-log line; push off by default.
 6. **Resume signal for `Blocked` items:** owner answers in the Notes cell and flips Status back to `Backlog`.
 
 ## Feasibility note (to resolve in the plan)
 
-The ambitious/uncertain part is the **unattended launch mechanism**: a 07:00 scheduled trigger that starts a headless autonomous Claude Code session which then runs the full read → triage → build → draft-PR pipeline. The plan must pin down exactly how that session is launched (the environment's cron/scheduled-run mechanism), how it authenticates, and how it stays bounded (≤3 builds, evidence gates, hard stop before merge). If a fully-headless launch proves unreliable, the fallback is the owner-confirmed session-start trigger — same pipeline, launched on first daily use instead of by clock.
+The trigger is a Claude Code **SessionStart hook** (documented, first-class) plus a once-per-day guard, launching the pipeline in the background — no unattended/headless machinery, so the earlier reliability risk is gone. The remaining care-points for the plan: (a) the hook must be cheap and non-blocking (a guard check + a background launch, not the build itself, so opening Claude Code is never slowed); (b) the background run must stay bounded (≤3 builds, evidence gates, hard stop before merge); (c) the hook needs the service-account key present — if it's missing/misconfigured the hook no-ops with a note rather than erroring on every session start.
