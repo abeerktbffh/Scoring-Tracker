@@ -11,7 +11,7 @@ import { localDateInTz } from "../../src/lib/day";
 import { PLATFORM_TZ } from "../../src/lib/group";
 
 const SHEET_ID = "1HSNw7eimmBMe-B5tSCSKEBHZCt1oaxW7";
-const RANGE = "Tracker!A1:K1000";
+const RANGE = "Tracker!A:K"; // unbounded — won't silently truncate as the tracker grows
 const STATE_PATH = ".superpowers/bug-automation/state.json";
 
 const keyPath = process.env.GSHEETS_KEY_FILE;
@@ -19,7 +19,15 @@ if (!keyPath) {
   console.error("[bug-automation] GSHEETS_KEY_FILE not set — skipping (no key configured).");
   process.exit(0);
 }
-const key = JSON.parse(readFileSync(keyPath, "utf8"));
+let key;
+try {
+  key = JSON.parse(readFileSync(keyPath, "utf8"));
+} catch {
+  // Missing file, bad path, or malformed JSON — this is reused by the Phase 3
+  // SessionStart hook, so it must no-op gracefully instead of throwing noisily.
+  console.error("[bug-automation] could not read GSHEETS_KEY_FILE — skipping.");
+  process.exit(0);
+}
 const today = localDateInTz(PLATFORM_TZ);
 
 const token = await getAccessToken(key, { nowSec: Math.floor(Date.now() / 1000) });

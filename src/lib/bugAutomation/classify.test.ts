@@ -16,6 +16,15 @@ describe("classifyItem — isNew", () => {
     expect(classifyItem({ ...base, created: "2026-07-18" }, { lastRunDate: "2026-07-17" }).isNew).toBe(true);
     expect(classifyItem({ ...base, created: "2026-07-16" }, { lastRunDate: "2026-07-17" }).isNew).toBe(false);
   });
+  it("is not new when created is empty and there is a prior run", () => {
+    expect(classifyItem({ ...base, created: "" }, { lastRunDate: "2026-07-17" }).isNew).toBe(false);
+  });
+  it("is surfaced as new when created is non-ISO, even if it lexicographically looks earlier than last run", () => {
+    // "1/13/2026" starts with "1", which sorts BEFORE "2026-07-17" as a plain string,
+    // so a naive lexicographic compare would silently mark this as not-new. Since we
+    // can't trust a non-ISO format's ordering, it must be surfaced instead of hidden.
+    expect(classifyItem({ ...base, created: "1/13/2026" }, { lastRunDate: "2026-07-17" }).isNew).toBe(true);
+  });
 });
 
 describe("classifyItem — guardrail bar (cheap gates)", () => {

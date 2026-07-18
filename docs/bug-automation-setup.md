@@ -23,3 +23,6 @@ via a Google service account (no browser needed, runs unattended).
    ```
    Expected: a triage summary listing the sheet's items, split into "Auto-build candidates" and
    "Needs you". It writes **nothing** to the sheet.
+
+   Note: the `Created` column must be plain-text `YYYY-MM-DD` (not a locale-formatted date cell)
+   so "new since last run" comparisons work.
