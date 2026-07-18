@@ -8,3 +8,6 @@ next-env.d.ts
 
 # Reference implementations for workstream D (offline games) — not part of the app build
 Offline Games/
+
+# Bug automation — never commit the service-account key
+.gsheets-key.json
