@@ -24,6 +24,7 @@ Reading and writing the sheet unattended requires the **Google Sheets API** via 
 2. Create a service account, download a JSON key.
 3. Share the sheet with the service account's `client_email` as **Editor**.
 4. Store the key locally (path in `.env.local`, e.g. `GSHEETS_KEY_FILE=./.gsheets-key.json`); **gitignore the key** — never committed. Auth is a signed JWT → access token, then the Sheets REST API (no npm dependency needed; Node built-in `crypto`).
+5. **Scheduled wake:** set a macOS wake timer (`sudo pmset repeat wakeorpoweron MTWRFSU 06:55:00`) so the Mac is awake before the 07:00 IST run. The owner runs this `sudo` command themselves (it needs admin). Without it, a sleeping/closed laptop misses the run.
 
 Sheet coordinates (from [[bragboard-bug-tracker]]): id `1HSNw7eimmBMe-B5tSCSKEBHZCt1oaxW7`, tab `Tracker`, columns A=ID … F=Status … J=Resolved, K=Notes/Links. Status vocab: `Backlog / In Progress / In Review / Blocked / Done`.
 
@@ -74,11 +75,11 @@ When a candidate is under-specified, has multiple plausible readings, or can't b
 - Build attempted but not confidently completable (tests won't pass, fix unclear) → **`Blocked`** + `[auto-blocked …]` note with the drafted plan and the blocker (does **not** force a bad PR).
 - `Done` → owner-set after merge/deploy (the automation never sets `Done`).
 
-## Schedule & notification (defaults — confirm during review)
+## Schedule & notification (owner-confirmed)
 
-- **Schedule:** once daily at **08:00 IST** via the environment's cron/scheduled-wake, triggering a scoped autonomous run of this automation. *(Confirm time.)*
-- **Per-day build cap:** **1** (highest-priority qualifying item). *(Confirm / raise.)*
-- **Notification:** the run (a) opens the draft PR (GitHub emails the owner) **and** (b) writes a one-line run summary into the sheet (a `Run Log` note/tab). Optional push notification available. *(Confirm channel.)*
+- **Schedule:** once daily at **07:00 IST**, triggered via a scheduled autonomous run (registered with the environment's cron mechanism), paired with the `pmset` scheduled-wake above so the Mac is awake to run it.
+- **Per-day build cap:** **3** (safety ceiling; process highest-priority qualifying items first). Rarely binding on normal intake — it's a guard against a flood or a runaway, not a throttle. Raisable later.
+- **Notification:** the run (a) opens each draft PR (GitHub emails the owner) **and** (b) writes a one-line run summary into the sheet (a `Run Log` note/tab). Push notification is **off** by default (can be enabled later).
 
 ## Failure & safety behaviour
 
@@ -95,9 +96,15 @@ When a candidate is under-specified, has multiple plausible readings, or can't b
 - Brainstorming without the owner (impossible unattended) — under-specified items use the clarification loop instead.
 - Real-time/near-instant reaction to sheet edits (this is a once-daily batch; a row added mid-day is picked up next run).
 
-## Open items to confirm (owner review)
+## Decisions (owner-confirmed 2026-07-18)
 
-1. Per-day build cap (default 1).
-2. Schedule time (default 08:00 IST).
-3. Notification channel (default: draft PR + sheet run-log line; push optional).
-4. Resume signal for `Blocked` items — is "flip Status back to `Backlog` after answering in Notes" acceptable, or prefer another signal?
+1. **Autonomy:** build-to-draft-PR; merge/deploy always manual.
+2. **Access:** Google Sheets API service account (read + write).
+3. **Per-day build cap:** 3 (safety ceiling, highest-priority first).
+4. **Schedule:** 07:00 IST daily + macOS `pmset` scheduled-wake.
+5. **Notification:** draft PR + one-line sheet run-log line; push off by default.
+6. **Resume signal for `Blocked` items:** owner answers in the Notes cell and flips Status back to `Backlog`.
+
+## Feasibility note (to resolve in the plan)
+
+The ambitious/uncertain part is the **unattended launch mechanism**: a 07:00 scheduled trigger that starts a headless autonomous Claude Code session which then runs the full read → triage → build → draft-PR pipeline. The plan must pin down exactly how that session is launched (the environment's cron/scheduled-run mechanism), how it authenticates, and how it stays bounded (≤3 builds, evidence gates, hard stop before merge). If a fully-headless launch proves unreliable, the fallback is the owner-confirmed session-start trigger — same pipeline, launched on first daily use instead of by clock.
