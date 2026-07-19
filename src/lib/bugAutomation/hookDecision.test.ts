@@ -7,7 +7,8 @@ describe("decideHook", () => {
       .toEqual({ fire: true, reason: "due" });
   });
   it("does not fire if already run today", () => {
-    expect(decideHook({ state: { lastRunDate: "2026-07-19", lastRunAt: null }, today: "2026-07-19", hasKey: true }).fire).toBe(false);
+    expect(decideHook({ state: { lastRunDate: "2026-07-19", lastRunAt: null }, today: "2026-07-19", hasKey: true }))
+      .toEqual({ fire: false, reason: "already-ran-today" });
   });
   it("does not fire if no key configured (silent no-op)", () => {
     expect(decideHook({ state: { lastRunDate: null, lastRunAt: null }, today: "2026-07-19", hasKey: false }))

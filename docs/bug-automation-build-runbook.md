@@ -88,7 +88,10 @@ Run this once per candidate object from `run-build.mjs --emit-plan`
 5. **Push the branch**, then open the PR:
    `openDraftPr({ token, repo, head: branch, base: "main", title, body }, opts)`
    with `draft: true` implied — the body must contain the interpretation, the
-   repro/test, and a summary of the change. **HARD STOP — never merge.**
+   repro/test, and a summary of the change. Obtain `token` via
+   `git credential fill` (e.g. `printf 'protocol=https\nhost=github.com\n\n' | git credential fill | sed -n 's/^password=//p'`)
+   — it must never be printed or committed, matching this repo's established
+   token-handling pattern. **HARD STOP — never merge.**
 
 6. **Mark in review:**
    `recordOutcome(item, { kind: "prOpened", prUrl }, today, opts)`

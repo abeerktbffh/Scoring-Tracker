@@ -19,4 +19,4 @@ const args = ["tsx", "scripts/bug-automation/run-build.mjs"]; // dry-run planner
 const child = spawn("npx", args, { detached: true, stdio: "ignore" });
 child.unref();
 writeState(STATE_PATH, { lastRunDate: today, lastRunAt: new Date().toISOString() });
-console.error(`[bug-automation] daily loop launched (${armed ? "armed" : "dry-run"}).`);
+console.error(`[bug-automation] daily loop launched (dry-run planner; real armed build not wired yet${armed ? ", BUG_AUTOMATION_BUILD=1 set but inert" : ""}).`);
