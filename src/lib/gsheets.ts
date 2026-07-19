@@ -47,7 +47,9 @@ export async function getAccessToken(
   return data.access_token;
 }
 
-/** Read a range from a spreadsheet. Read-only — Phase 1 has no write function. */
+const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
+
+/** Read a range from a spreadsheet. */
 export async function getValues(
   token: string,
   sheetId: string,
@@ -55,9 +57,39 @@ export async function getValues(
   opts?: { fetchImpl?: typeof fetch },
 ): Promise<string[][]> {
   const f = opts?.fetchImpl ?? fetch;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`;
+  const url = `${BASE}/${sheetId}/values/${encodeURIComponent(range)}`;
   const res = await f(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Sheets getValues failed: ${res.status}`);
   const data = (await res.json()) as { values?: string[][] };
   return data.values ?? [];
+}
+
+/** Overwrite a range (RAW). Write function — introduced in Phase 2a. */
+export async function updateValues(
+  token: string, sheetId: string, range: string, values: string[][],
+  opts?: { fetchImpl?: typeof fetch },
+): Promise<void> {
+  const f = opts?.fetchImpl ?? fetch;
+  const url = `${BASE}/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+  const res = await f(url, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ values }),
+  });
+  if (!res.ok) throw new Error(`Sheets updateValues failed: ${res.status}`);
+}
+
+/** Append rows to the end of a range (RAW, INSERT_ROWS). */
+export async function appendValues(
+  token: string, sheetId: string, range: string, values: string[][],
+  opts?: { fetchImpl?: typeof fetch },
+): Promise<void> {
+  const f = opts?.fetchImpl ?? fetch;
+  const url = `${BASE}/${sheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+  const res = await f(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ values }),
+  });
+  if (!res.ok) throw new Error(`Sheets appendValues failed: ${res.status}`);
 }

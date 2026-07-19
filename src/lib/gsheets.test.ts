@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateKeyPairSync, createVerify } from "node:crypto";
-import { buildJwt, getAccessToken, getValues } from "./gsheets";
+import { buildJwt, getAccessToken, getValues, updateValues, appendValues } from "./gsheets";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const KEY = { client_email: "bot@proj.iam.gserviceaccount.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString() };
@@ -57,5 +57,39 @@ describe("getValues", () => {
   it("returns [] when the sheet range is empty (no values field)", async () => {
     const fetchImpl = (async () => ({ ok: true, json: async () => ({}) })) as unknown as typeof fetch;
     expect(await getValues("t", "S", "R", { fetchImpl })).toEqual([]);
+  });
+});
+
+describe("updateValues", () => {
+  it("PUTs values to the range with RAW input and bearer auth", async () => {
+    let cap: any = null;
+    const fetchImpl = (async (url: string, init: any) => {
+      cap = { url, method: init.method, auth: init.headers.Authorization, body: init.body };
+      return { ok: true, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+    await updateValues("tok", "SHEET", "Tracker!F5", [["In Review"]], { fetchImpl });
+    expect(cap.method).toBe("PUT");
+    expect(cap.url).toContain("/spreadsheets/SHEET/values/");
+    expect(cap.url).toContain("valueInputOption=RAW");
+    expect(cap.auth).toBe("Bearer tok");
+    expect(JSON.parse(cap.body)).toEqual({ values: [["In Review"]] });
+  });
+  it("throws on non-ok", async () => {
+    const fetchImpl = (async () => ({ ok: false, status: 403, json: async () => ({}) })) as unknown as typeof fetch;
+    await expect(updateValues("t", "S", "Tracker!F5", [["x"]], { fetchImpl })).rejects.toThrow(/403/);
+  });
+});
+
+describe("appendValues", () => {
+  it("POSTs to the :append endpoint with INSERT_ROWS", async () => {
+    let cap: any = null;
+    const fetchImpl = (async (url: string, init: any) => {
+      cap = { url, method: init.method };
+      return { ok: true, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+    await appendValues("tok", "SHEET", "Run Log!A:E", [["2026-07-19", "x"]], { fetchImpl });
+    expect(cap.method).toBe("POST");
+    expect(cap.url).toContain(":append");
+    expect(cap.url).toContain("insertDataOption=INSERT_ROWS");
   });
 });
