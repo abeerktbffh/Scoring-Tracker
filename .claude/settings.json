@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx scripts/bug-automation/session-start-hook.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}
