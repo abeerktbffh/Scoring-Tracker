@@ -10,7 +10,7 @@ import { readState, writeState } from "../../src/lib/bugAutomation/state";
 import { localDateInTz } from "../../src/lib/day";
 import { PLATFORM_TZ } from "../../src/lib/group";
 
-const SHEET_ID = "1HSNw7eimmBMe-B5tSCSKEBHZCt1oaxW7";
+const SHEET_ID = "1oXejKyupwd0ZqI1qI5qLF62M00-sq0EMXtVxnSdyohs";
 const RANGE = "Tracker!A:K"; // unbounded — won't silently truncate as the tracker grows
 const STATE_PATH = ".superpowers/bug-automation/state.json";
 
