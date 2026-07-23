@@ -12,6 +12,7 @@ import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { formatPendingGames } from "@/lib/pendingGames";
 import styles from "./page.module.css";
 
 const SNAPSHOT_SIZE = 5;
@@ -150,6 +151,7 @@ function HomeReady({ me, rows, onLog, isGroup }: HomeReadyProps): JSX.Element {
             </Tile>
           ))}
         </div>
+        <p className={styles.pending}>{formatPendingGames(me.today.games)}</p>
         <div className={styles.streakRow}>
           <StreakBadge count={streak} />
           {streak > 0 && <span className={styles.streakLabel}>day streak</span>}
