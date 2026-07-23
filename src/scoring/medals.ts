@@ -129,7 +129,7 @@ export interface DailyContestStat {
 // games) always sorts first.
 const PIPS_ORDER: Record<string, number> = { easy: 0, medium: 1, hard: 2 };
 
-function compareVariant(a: string | null, b: string | null): number {
+export function compareVariant(a: string | null, b: string | null): number {
   if (a === b) return 0;
   if (a === null) return -1;
   if (b === null) return 1;

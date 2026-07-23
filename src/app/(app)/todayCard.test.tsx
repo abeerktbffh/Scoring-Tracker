@@ -6,9 +6,9 @@ import { TodayCard } from "./TodayCard";
 
 afterEach(cleanup);
 
-const detail = [
-  { gameId: "wordle", name: "Wordle", played: true, valueFormatted: "3/6 ✓", solved: true, rank: 2, playerCount: 6 },
-  { gameId: "nyt-mini", name: "NYT Mini", played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
+const detail: import("@/scoring/todayDetail").TodayGameDetail[] = [
+  { gameId: "wordle", name: "Wordle", variant: null, played: true, valueFormatted: "3/6 ✓", solved: true, rank: 2, playerCount: 6 },
+  { gameId: "nyt-mini", name: "NYT Mini", variant: null, played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
 ];
 
 describe("TodayCard", () => {
@@ -74,5 +74,21 @@ describe("TodayCard", () => {
     const play = screen.getByRole("link", { name: /open wordle/i });
     fireEvent.keyDown(play, { key: "Enter" });
     expect(card.getAttribute("aria-expanded")).toBe("true"); // unchanged — link handles its own activation
+  });
+  it("labels a variant row with its difficulty", () => {
+    render(<TodayCard loggedCount={3} totalCount={6} games={[]} streak={4} todayDetail={[
+      { gameId: "pips", name: "Pips", variant: "easy", played: true, valueFormatted: "1:12", solved: true, rank: 1, playerCount: 3 },
+    ]} />);
+    fireEvent.click(screen.getByRole("button", { name: /today/i }));
+    expect(screen.getByText(/Pips.*Easy/i)).toBeTruthy();
+  });
+  it("renders multiple same-game rows (distinct variants) without key collisions", () => {
+    render(<TodayCard loggedCount={3} totalCount={6} games={[]} streak={4} todayDetail={[
+      { gameId: "pips", name: "Pips", variant: "easy", played: true, valueFormatted: "1:12", solved: true, rank: 1, playerCount: 3 },
+      { gameId: "pips", name: "Pips", variant: "hard", played: false, valueFormatted: null, solved: false, rank: null, playerCount: 2 },
+    ]} />);
+    fireEvent.click(screen.getByRole("button", { name: /today/i }));
+    expect(screen.getByText(/Pips.*Easy/i)).toBeTruthy();
+    expect(screen.getByText(/Pips.*Hard/i)).toBeTruthy();
   });
 });

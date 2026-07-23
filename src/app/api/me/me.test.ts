@@ -55,7 +55,7 @@ describe("GET /api/me", () => {
     expect(body.recent).toEqual([]);
     expect(body.displayName).toBe("Session User");
     expect(body.todayDetail).toEqual([
-      { gameId: "g_wordle", name: "Wordle", played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
+      { gameId: "g_wordle", name: "Wordle", variant: null, played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
     ]);
 
     // Games query drops the group filter — global catalog, active games only.
@@ -200,7 +200,7 @@ describe("GET /api/me", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.todayDetail).toEqual([
-      { gameId: "wordle", name: "Wordle", played: true, valueFormatted: "4/6 ✓", solved: true, rank: 2, playerCount: 3 },
+      { gameId: "wordle", name: "Wordle", variant: null, played: true, valueFormatted: "4/6 ✓", solved: true, rank: 2, playerCount: 3 },
     ]);
   });
 });
