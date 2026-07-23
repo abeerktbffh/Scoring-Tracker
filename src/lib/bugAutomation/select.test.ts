@@ -9,17 +9,24 @@ const mk = (o: Partial<BugItem>): BugItem => ({
 });
 
 describe("selectBuildCandidates", () => {
-  it("returns only new auto-build candidates, Critical before High, capped", () => {
+  it("returns eligible Backlog bugs, Critical before High, capped — regardless of age", () => {
     const items = [
       mk({ id: "H1", priority: "High" }),
       mk({ id: "C1", priority: "Critical" }),
       mk({ id: "M1", type: "Improvement" }),        // not a bug → excluded
       mk({ id: "L1", priority: "Low" }),             // low → excluded
       mk({ id: "H2", priority: "High" }),
-      mk({ id: "OLD", priority: "Critical", created: "2026-01-01" }), // not new
+      mk({ id: "OLD", priority: "Critical", created: "2026-01-01" }), // old but still Backlog → INCLUDED
     ];
     const out = selectBuildCandidates(items, { lastRunDate: "2026-07-18" }, 3);
-    expect(out.map((i) => i.id)).toEqual(["C1", "H1", "H2"]);
+    expect(out.map((i) => i.id)).toEqual(["C1", "OLD", "H1"]);
+  });
+  it("excludes non-Backlog items (already acted on) so nothing is rebuilt", () => {
+    const items = [
+      mk({ id: "INREVIEW", priority: "Critical", status: "In Review" }),
+      mk({ id: "C1", priority: "Critical" }),
+    ];
+    expect(selectBuildCandidates(items, { lastRunDate: null }).map((i) => i.id)).toEqual(["C1"]);
   });
   it("defaults the cap to 3", () => {
     const many = Array.from({ length: 5 }, (_, i) => mk({ id: `C${i}`, priority: "Critical" }));
