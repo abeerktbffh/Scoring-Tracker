@@ -29,6 +29,7 @@ const yesterday = "2026-07-02";
 // me.displayName, never from localStorage.
 const meResponse: MeResponse = {
   today: { date: today, loggedCount: 3, totalCount: 5, games: [] },
+  todayDetail: [],
   streaks: [
     { gameId: "wordle", name: "Wordle", currentStreak: 7, longestStreak: 12 },
     { gameId: "pips", name: "Pips", currentStreak: 4, longestStreak: 4 },

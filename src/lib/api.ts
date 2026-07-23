@@ -4,6 +4,7 @@
 
 import type { ResultDetail } from "@/parsers/types";
 export type { ResultDetail } from "@/parsers/types";
+import type { TodayGameDetail } from "@/scoring/todayDetail";
 
 export interface Game {
   id: string;
@@ -54,6 +55,7 @@ export interface MeResponse {
     totalCount: number;
     games: { gameId: string; name: string; logged: boolean }[];
   };
+  todayDetail: TodayGameDetail[];
   streaks: { gameId: string; name: string; currentStreak: number; longestStreak: number }[];
   recent: {
     gameId: string;

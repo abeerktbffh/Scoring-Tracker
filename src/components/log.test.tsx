@@ -37,6 +37,7 @@ const meResponse: MeResponse = {
       { gameId: "mini", name: "NYT Mini", logged: false },
     ],
   },
+  todayDetail: [],
   streaks: [],
   recent: [],
   displayName: "You",

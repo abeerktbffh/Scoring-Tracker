@@ -43,7 +43,8 @@ describe("GET /api/me", () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock
       .mockResolvedValueOnce([{ id: "g_wordle", name: "Wordle" }]) // active games
-      .mockResolvedValueOnce([]); // entries for the user
+      .mockResolvedValueOnce([]) // entries for the user
+      .mockResolvedValueOnce([]); // today's entries across all players
 
     const res = await GET(req());
     expect(res.status).toBe(200);
@@ -53,6 +54,9 @@ describe("GET /api/me", () => {
     expect(body.today.games).toEqual([{ gameId: "g_wordle", name: "Wordle", logged: false }]);
     expect(body.recent).toEqual([]);
     expect(body.displayName).toBe("Session User");
+    expect(body.todayDetail).toEqual([
+      { gameId: "g_wordle", name: "Wordle", played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
+    ]);
 
     // Games query drops the group filter — global catalog, active games only.
     const gamesQueryStrings: string[] = sqlMock.mock.calls[0][0];
@@ -73,7 +77,7 @@ describe("GET /api/me", () => {
       ok: true,
       viewer: { userId: "u1", displayName: null, isSuperAdmin: false },
     });
-    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const res = await GET(req());
     const body = await res.json();
@@ -82,17 +86,17 @@ describe("GET /api/me", () => {
 
   it("always queries entries for an authenticated user (no player-less short-circuit)", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
-    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const res = await GET(req());
     expect(res.status).toBe(200);
-    // Exactly two queries: games + entries. No groups lookup, no skip.
-    expect(sqlMock).toHaveBeenCalledTimes(2);
+    // Exactly three queries: games + viewer entries + today's all-player entries. No groups lookup, no skip.
+    expect(sqlMock).toHaveBeenCalledTimes(3);
   });
 
   it("uses requireUser and the global queries when ?group= is absent", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
-    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     await GET(req());
     expect(requireUserMock).toHaveBeenCalled();
@@ -101,12 +105,26 @@ describe("GET /api/me", () => {
 
   it("excludes entries for inactive games from the global (ungrouped) You list", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
-    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     await GET(req());
     const entriesCall = sqlMock.mock.calls[1];
     const entriesQueryText = entriesCall[0].join(" ").replace(/\s+/g, " ");
     expect(entriesQueryText).toContain("g.active = true");
+  });
+
+  it("global (ungrouped) today query also joins users and excludes null display_name, without a viewer restriction", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await GET(req());
+    const todayEntriesCall = sqlMock.mock.calls[2];
+    const todayEntriesQueryText = todayEntriesCall[0].join(" ").replace(/\s+/g, " ");
+    expect(todayEntriesQueryText).toContain("e.puzzle_date =");
+    expect(todayEntriesQueryText).not.toContain("e.user_id =");
+    expect(todayEntriesQueryText).toContain("g.active = true");
+    expect(todayEntriesQueryText).toMatch(/JOIN users u ON u\.id = e\.user_id/);
+    expect(todayEntriesQueryText).toContain("u.display_name IS NOT NULL");
   });
 
   it("403s a non-member requesting ?group=g1, never touching the DB", async () => {
@@ -123,6 +141,7 @@ describe("GET /api/me", () => {
     requireMemberMock.mockResolvedValue(USER_VIEWER);
     sqlMock
       .mockResolvedValueOnce([{ id: "g_wordle", name: "Wordle" }])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const res = await GET(req("http://localhost/api/me?group=g1"));
@@ -145,5 +164,43 @@ describe("GET /api/me", () => {
       /AND e\.game_id IN \( SELECT gg\.game_id FROM group_games gg JOIN games ga ON ga\.id = gg\.game_id AND ga\.active = true WHERE gg\.group_id = /,
     );
     expect(entriesCall.slice(1)).toContain("g1");
+
+    // Today's cross-player entries query is scoped the same way (group membership +
+    // tracked-active games) but WITHOUT restricting to the viewer's own user_id.
+    const todayEntriesCall = sqlMock.mock.calls[2];
+    const todayEntriesQueryText = todayEntriesCall[0].join(" ").replace(/\s+/g, " ");
+    expect(todayEntriesQueryText).toContain("e.puzzle_date =");
+    expect(todayEntriesQueryText).not.toContain("e.user_id =");
+    expect(todayEntriesQueryText).toMatch(
+      /AND e\.user_id IN \(SELECT user_id FROM memberships WHERE group_id = /,
+    );
+    expect(todayEntriesQueryText).toMatch(
+      /AND e\.game_id IN \( SELECT gg\.game_id FROM group_games gg JOIN games ga ON ga\.id = gg\.game_id AND ga\.active = true WHERE gg\.group_id = /,
+    );
+    expect(todayEntriesCall.slice(1)).toContain("g1");
+
+    // Rank parity with the board route: today's query joins users and excludes
+    // players with no display name, same as src/app/api/games/[gameId]/board/route.ts.
+    expect(todayEntriesQueryText).toMatch(/JOIN users u ON u\.id = e\.user_id/);
+    expect(todayEntriesQueryText).toContain("u.display_name IS NOT NULL");
+  });
+
+  it("returns todayDetail with the viewer's today rank for a game (2nd of 3)", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock
+      .mockResolvedValueOnce([{ id: "wordle", name: "Wordle" }]) // active games
+      .mockResolvedValueOnce([]) // viewer's own entries (streaks/recent) — irrelevant here
+      .mockResolvedValueOnce([
+        { user_id: "u2", game_id: "wordle", variant: null, parsed_value: 3, solved: true, metric_direction: "lower_better", detail: null },
+        { user_id: "u1", game_id: "wordle", variant: null, parsed_value: 4, solved: true, metric_direction: "lower_better", detail: null },
+        { user_id: "u3", game_id: "wordle", variant: null, parsed_value: 5, solved: true, metric_direction: "lower_better", detail: null },
+      ]); // today's entries across all players
+
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.todayDetail).toEqual([
+      { gameId: "wordle", name: "Wordle", played: true, valueFormatted: "4/6 ✓", solved: true, rank: 2, playerCount: 3 },
+    ]);
   });
 });
