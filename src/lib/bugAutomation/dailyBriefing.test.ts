@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDailyBriefing } from "./dailyBriefing";
+import { formatDailyBriefing, formatRunLogCandidates } from "./dailyBriefing";
 
 describe("formatDailyBriefing", () => {
   const cands = [
@@ -16,5 +16,16 @@ describe("formatDailyBriefing", () => {
   });
   it("says so when there are no candidates", () => {
     expect(formatDailyBriefing([], "2026-07-23")).toBe("🐛 Daily bug check (2026-07-23): no new build candidates.");
+  });
+});
+
+describe("formatRunLogCandidates", () => {
+  it("emits one row with the candidate ids", () => {
+    expect(formatRunLogCandidates("2026-07-23", [{ id: "B002" }, { id: "B001" }]))
+      .toEqual([["2026-07-23", "notify", "candidates:2", "B002,B001", ""]]);
+  });
+  it("uses '-' and candidates:0 when empty", () => {
+    expect(formatRunLogCandidates("2026-07-23", []))
+      .toEqual([["2026-07-23", "notify", "candidates:0", "-", ""]]);
   });
 });
