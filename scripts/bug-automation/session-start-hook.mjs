@@ -23,16 +23,33 @@ const state = readState(STATE_PATH);
 const decision = decideHook({ state, today, hasKey: existsSync(KEY_PATH) });
 if (!decision.fire) process.exit(0);
 
+// Bound every network call so a bad network moment can't stall session start.
+const tfetch = (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(6000) });
+
 let context = null;
+let token = null;
+let candidates = null;
 try {
   const key = JSON.parse(readFileSync(KEY_PATH, "utf8"));
-  const token = await getAccessToken(key, { nowSec: Math.floor(Date.now() / 1000) });
-  const items = parseRows(await getValues(token, SHEET_ID, "Tracker!A:K"));
-  const candidates = selectBuildCandidates(items, { lastRunDate: state.lastRunDate }, 3);
+  token = await getAccessToken(key, { nowSec: Math.floor(Date.now() / 1000), fetchImpl: tfetch });
+  const items = parseRows(await getValues(token, SHEET_ID, "Tracker!A:K", { fetchImpl: tfetch }));
+  candidates = selectBuildCandidates(items, { lastRunDate: state.lastRunDate }, 3);
   context = formatDailyBriefing(candidates, today);
-  await appendValues(token, SHEET_ID, "Run Log!A:E", formatRunLogCandidates(today, candidates));
 } catch {
   context = null; // best-effort: on any error, skip silently
+  candidates = null;
+}
+
+// Best-effort Run Log append: independent of the briefing above. A failure
+// here must not wipe an already-computed briefing (separate deliverables).
+if (candidates) {
+  try {
+    await appendValues(token, SHEET_ID, "Run Log!A:E", formatRunLogCandidates(today, candidates), {
+      fetchImpl: tfetch,
+    });
+  } catch {
+    // best-effort: briefing still shown; log row skipped
+  }
 }
 
 // Write state even on error so a transient failure doesn't retry-spam today.
@@ -43,4 +60,3 @@ if (context) {
     JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context } }),
   );
 }
-process.exit(0);
