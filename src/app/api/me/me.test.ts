@@ -113,6 +113,20 @@ describe("GET /api/me", () => {
     expect(entriesQueryText).toContain("g.active = true");
   });
 
+  it("global (ungrouped) today query also joins users and excludes null display_name, without a viewer restriction", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    sqlMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await GET(req());
+    const todayEntriesCall = sqlMock.mock.calls[2];
+    const todayEntriesQueryText = todayEntriesCall[0].join(" ").replace(/\s+/g, " ");
+    expect(todayEntriesQueryText).toContain("e.puzzle_date =");
+    expect(todayEntriesQueryText).not.toContain("e.user_id =");
+    expect(todayEntriesQueryText).toContain("g.active = true");
+    expect(todayEntriesQueryText).toMatch(/JOIN users u ON u\.id = e\.user_id/);
+    expect(todayEntriesQueryText).toContain("u.display_name IS NOT NULL");
+  });
+
   it("403s a non-member requesting ?group=g1, never touching the DB", async () => {
     requireMemberMock.mockResolvedValue({ ok: false, status: 403, error: "Not a member" });
 
@@ -164,6 +178,11 @@ describe("GET /api/me", () => {
       /AND e\.game_id IN \( SELECT gg\.game_id FROM group_games gg JOIN games ga ON ga\.id = gg\.game_id AND ga\.active = true WHERE gg\.group_id = /,
     );
     expect(todayEntriesCall.slice(1)).toContain("g1");
+
+    // Rank parity with the board route: today's query joins users and excludes
+    // players with no display name, same as src/app/api/games/[gameId]/board/route.ts.
+    expect(todayEntriesQueryText).toMatch(/JOIN users u ON u\.id = e\.user_id/);
+    expect(todayEntriesQueryText).toContain("u.display_name IS NOT NULL");
   });
 
   it("returns todayDetail with the viewer's today rank for a game (2nd of 3)", async () => {

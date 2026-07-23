@@ -59,6 +59,7 @@ export function TodayCard({ loggedCount, totalCount, games, streak, todayDetail 
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
+      if ((e.target as HTMLElement).closest("a")) return;
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         toggle();

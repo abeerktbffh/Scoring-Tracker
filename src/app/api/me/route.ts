@@ -100,9 +100,11 @@ export async function GET(req: Request) {
         SELECT e.user_id, e.game_id, e.variant, e.parsed_value, e.solved,
                g.metric_direction, e.detail
         FROM entries e
+        JOIN users u ON u.id = e.user_id
         JOIN games g ON g.id = e.game_id
         WHERE e.puzzle_date = ${today}::date
           AND e.superseded_by IS NULL AND e.is_late = false
+          AND u.display_name IS NOT NULL
           AND e.user_id IN (SELECT user_id FROM memberships WHERE group_id = ${groupId})
           AND e.game_id IN (
             SELECT gg.game_id FROM group_games gg
@@ -114,9 +116,11 @@ export async function GET(req: Request) {
         SELECT e.user_id, e.game_id, e.variant, e.parsed_value, e.solved,
                g.metric_direction, e.detail
         FROM entries e
+        JOIN users u ON u.id = e.user_id
         JOIN games g ON g.id = e.game_id
         WHERE e.puzzle_date = ${today}::date
           AND e.superseded_by IS NULL AND e.is_late = false
+          AND u.display_name IS NOT NULL
           AND g.active = true
       `) as {
     user_id: string;
