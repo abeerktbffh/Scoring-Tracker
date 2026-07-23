@@ -7,8 +7,8 @@ import { TodayCard } from "./TodayCard";
 afterEach(cleanup);
 
 const detail = [
-  { gameId: "wordle", name: "Wordle", played: true, valueFormatted: "3/6 ✓", solved: true, rank: 2, playerCount: 6 },
-  { gameId: "nyt-mini", name: "NYT Mini", played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
+  { gameId: "wordle", name: "Wordle", variant: null, played: true, valueFormatted: "3/6 ✓", solved: true, rank: 2, playerCount: 6 },
+  { gameId: "nyt-mini", name: "NYT Mini", variant: null, played: false, valueFormatted: null, solved: false, rank: null, playerCount: 0 },
 ];
 
 describe("TodayCard", () => {
