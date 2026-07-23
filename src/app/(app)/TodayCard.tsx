@@ -34,6 +34,10 @@ function ordinal(n: number): string {
   }
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function medalClass(rank: number | null): string | undefined {
   if (rank === 1) return styles.rank1;
   if (rank === 2) return styles.rank2;
@@ -84,7 +88,6 @@ export function TodayCard({ loggedCount, totalCount, games, streak, todayDetail 
             <b className={styles.bigCount}>{loggedCount}</b> of {totalCount} done
           </p>
         </div>
-        <ChevronDown size={18} className={[styles.chev, open ? styles.chevOpen : ""].join(" ")} />
       </div>
       <div className={styles.tiles}>
         {games.map((game) => (
@@ -97,15 +100,17 @@ export function TodayCard({ loggedCount, totalCount, games, streak, todayDetail 
       <div className={styles.streakRow}>
         <StreakBadge count={streak} />
         {streak > 0 && <span className={styles.streakLabel}>day streak</span>}
+        <ChevronDown size={18} className={[styles.chev, open ? styles.chevOpen : ""].join(" ")} />
       </div>
 
       {open && (
         <div className={styles.expandPanel}>
           {todayDetail.map((g) => {
             const url = gameUrl(g.gameId);
+            const label = g.variant ? `${g.name} — ${capitalize(g.variant)}` : g.name;
             return (
-              <div key={g.gameId} className={styles.gameRow}>
-                <span className={styles.gameName}>{g.name}</span>
+              <div key={`${g.gameId}|${g.variant ?? ""}`} className={styles.gameRow}>
+                <span className={styles.gameName}>{label}</span>
                 <span className={styles.gameScore}>{g.valueFormatted ?? "Not played today"}</span>
                 <span className={[styles.rankPill, medalClass(g.rank)].filter(Boolean).join(" ")}>
                   {g.rank != null ? `${ordinal(g.rank)} of ${g.playerCount}` : "—"}

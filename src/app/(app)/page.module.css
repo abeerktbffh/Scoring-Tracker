@@ -100,7 +100,7 @@
 .chev {
   flex: 0 0 auto;
   color: var(--muted);
-  margin-top: 2px;
+  margin-left: auto;
   transition: transform 0.15s ease;
 }
 
