@@ -6,13 +6,11 @@ import type { MeResponse, OverallRow } from "@/lib/api";
 import { useBoard } from "@/components/BoardContext";
 import { sortByMedals } from "@/lib/leaderboardSort";
 import { Card } from "@/components/Card";
-import { Tile } from "@/components/Tile";
-import { StreakBadge } from "@/components/StreakBadge";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { Skeleton } from "@/components/Skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { formatPendingGames } from "@/lib/pendingGames";
+import { TodayCard } from "./TodayCard";
 import styles from "./page.module.css";
 
 const SNAPSHOT_SIZE = 5;
@@ -139,24 +137,13 @@ function HomeReady({ me, rows, onLog, isGroup }: HomeReadyProps): JSX.Element {
 
   return (
     <>
-      <Card className={styles.today}>
-        <p className={styles.label}>Today</p>
-        <p className={styles.big}>
-          <b className={styles.bigCount}>{me.today.loggedCount}</b> of {me.today.totalCount} done
-        </p>
-        <div className={styles.tiles}>
-          {me.today.games.map((game) => (
-            <Tile key={game.gameId} state={game.logged ? "solved" : "empty"}>
-              {game.logged ? "✓" : "·"}
-            </Tile>
-          ))}
-        </div>
-        <p className={styles.pending}>{formatPendingGames(me.today.games)}</p>
-        <div className={styles.streakRow}>
-          <StreakBadge count={streak} />
-          {streak > 0 && <span className={styles.streakLabel}>day streak</span>}
-        </div>
-      </Card>
+      <TodayCard
+        loggedCount={me.today.loggedCount}
+        totalCount={me.today.totalCount}
+        games={me.today.games}
+        streak={streak}
+        todayDetail={me.todayDetail}
+      />
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>This week</h2>
