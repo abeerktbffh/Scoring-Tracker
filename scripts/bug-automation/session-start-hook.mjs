@@ -1,22 +1,62 @@
-// SessionStart hook — cheap, non-blocking. Fires the build loop at most once a
-// day. In default mode it runs the DRY-RUN planner (opens/writes nothing). Only
-// when BUG_AUTOMATION_BUILD=1 does it run the real loop — kept OFF until the
-// owner arms it after a supervised first build.
-import { spawn } from "node:child_process";
+// SessionStart hook — cheap, non-blocking, at most once a day. When due, it
+// reads the bug tracker, selects the top build candidates, appends one Run Log
+// row, and emits a daily briefing to Claude Code as SessionStart context so the
+// assistant can relay it. It NEVER builds, opens PRs, or writes bug rows
+// (builds are supervised). Best-effort: any error → skip silently, never block
+// session start. Key is read from ./.gsheets-key.json directly.
+import { existsSync, readFileSync } from "node:fs";
 import { readState, writeState } from "../../src/lib/bugAutomation/state";
 import { decideHook } from "../../src/lib/bugAutomation/hookDecision";
+import { getAccessToken, getValues, appendValues } from "../../src/lib/gsheets";
+import { parseRows } from "../../src/lib/bugAutomation/sheetModel";
+import { selectBuildCandidates } from "../../src/lib/bugAutomation/select";
+import { formatDailyBriefing, formatRunLogCandidates } from "../../src/lib/bugAutomation/dailyBriefing";
 import { localDateInTz } from "../../src/lib/day";
 import { PLATFORM_TZ } from "../../src/lib/group";
 
+const SHEET_ID = "1oXejKyupwd0ZqI1qI5qLF62M00-sq0EMXtVxnSdyohs";
 const STATE_PATH = ".superpowers/bug-automation/state.json";
+const KEY_PATH = "./.gsheets-key.json";
+
 const today = localDateInTz(PLATFORM_TZ);
-const decision = decideHook({ state: readState(STATE_PATH), today, hasKey: Boolean(process.env.GSHEETS_KEY_FILE) });
+const state = readState(STATE_PATH);
+const decision = decideHook({ state, today, hasKey: existsSync(KEY_PATH) });
 if (!decision.fire) process.exit(0);
 
-const armed = process.env.BUG_AUTOMATION_BUILD === "1";
-// Always dry-run for now; a future step wires the real build when armed.
-const args = ["tsx", "scripts/bug-automation/run-build.mjs"]; // dry-run planner
-const child = spawn("npx", args, { detached: true, stdio: "ignore" });
-child.unref();
+// Bound every network call so a bad network moment can't stall session start.
+const tfetch = (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(6000) });
+
+let context = null;
+let token = null;
+let candidates = null;
+try {
+  const key = JSON.parse(readFileSync(KEY_PATH, "utf8"));
+  token = await getAccessToken(key, { nowSec: Math.floor(Date.now() / 1000), fetchImpl: tfetch });
+  const items = parseRows(await getValues(token, SHEET_ID, "Tracker!A:K", { fetchImpl: tfetch }));
+  candidates = selectBuildCandidates(items, { lastRunDate: state.lastRunDate }, 3);
+  context = formatDailyBriefing(candidates, today);
+} catch {
+  context = null; // best-effort: on any error, skip silently
+  candidates = null;
+}
+
+// Best-effort Run Log append: independent of the briefing above. A failure
+// here must not wipe an already-computed briefing (separate deliverables).
+if (candidates) {
+  try {
+    await appendValues(token, SHEET_ID, "Run Log!A:E", formatRunLogCandidates(today, candidates), {
+      fetchImpl: tfetch,
+    });
+  } catch {
+    // best-effort: briefing still shown; log row skipped
+  }
+}
+
+// Write state even on error so a transient failure doesn't retry-spam today.
 writeState(STATE_PATH, { lastRunDate: today, lastRunAt: new Date().toISOString() });
-console.error(`[bug-automation] daily loop launched (dry-run planner; real armed build not wired yet${armed ? ", BUG_AUTOMATION_BUILD=1 set but inert" : ""}).`);
+
+if (context) {
+  process.stdout.write(
+    JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context } }),
+  );
+}
