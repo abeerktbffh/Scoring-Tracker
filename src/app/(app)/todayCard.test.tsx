@@ -82,4 +82,13 @@ describe("TodayCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /today/i }));
     expect(screen.getByText(/Pips.*Easy/i)).toBeTruthy();
   });
+  it("renders multiple same-game rows (distinct variants) without key collisions", () => {
+    render(<TodayCard loggedCount={3} totalCount={6} games={[]} streak={4} todayDetail={[
+      { gameId: "pips", name: "Pips", variant: "easy", played: true, valueFormatted: "1:12", solved: true, rank: 1, playerCount: 3 },
+      { gameId: "pips", name: "Pips", variant: "hard", played: false, valueFormatted: null, solved: false, rank: null, playerCount: 2 },
+    ]} />);
+    fireEvent.click(screen.getByRole("button", { name: /today/i }));
+    expect(screen.getByText(/Pips.*Easy/i)).toBeTruthy();
+    expect(screen.getByText(/Pips.*Hard/i)).toBeTruthy();
+  });
 });
