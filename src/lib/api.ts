@@ -54,6 +54,15 @@ export interface MeResponse {
     totalCount: number;
     games: { gameId: string; name: string; logged: boolean }[];
   };
+  todayDetail: {
+    gameId: string;
+    name: string;
+    played: boolean;
+    valueFormatted: string | null;
+    solved: boolean;
+    rank: number | null;
+    playerCount: number;
+  }[];
   streaks: { gameId: string; name: string; currentStreak: number; longestStreak: number }[];
   recent: {
     gameId: string;

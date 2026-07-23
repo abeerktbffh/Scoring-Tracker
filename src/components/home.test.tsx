@@ -39,6 +39,7 @@ const meResponse: MeResponse = {
       { gameId: "pinpoint", name: "Pinpoint", logged: false },
     ],
   },
+  todayDetail: [],
   streaks: [
     { gameId: "wordle", name: "Wordle", currentStreak: 7, longestStreak: 12 },
     { gameId: "connections", name: "Connections", currentStreak: 3, longestStreak: 5 },

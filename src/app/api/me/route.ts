@@ -3,6 +3,7 @@ import { sql } from "@/db/client";
 import { requireUser, requireMember } from "@/lib/membership";
 import { PLATFORM_TZ } from "@/lib/group";
 import { computeMe } from "@/scoring/me";
+import { computeTodayDetail } from "@/scoring/todayDetail";
 import { localDateInTz } from "@/lib/day";
 import type { ResultDetail } from "@/parsers/types";
 
@@ -90,5 +91,56 @@ export async function GET(req: Request) {
   }));
 
   const result = computeMe({ today, games, entries });
-  return NextResponse.json({ ...result, displayName: guard.viewer.displayName ?? null });
+
+  // Today's on-time entries across ALL players for the tracked games — used to
+  // compute the viewer's rank among today's field, never scoped to the viewer's
+  // own user_id (unlike `entryRows` above).
+  const todayEntryRows = (groupId
+    ? await sql`
+        SELECT e.user_id, e.game_id, e.variant, e.parsed_value, e.solved,
+               g.metric_direction, e.detail
+        FROM entries e
+        JOIN games g ON g.id = e.game_id
+        WHERE e.puzzle_date = ${today}::date
+          AND e.superseded_by IS NULL AND e.is_late = false
+          AND e.user_id IN (SELECT user_id FROM memberships WHERE group_id = ${groupId})
+          AND e.game_id IN (
+            SELECT gg.game_id FROM group_games gg
+            JOIN games ga ON ga.id = gg.game_id AND ga.active = true
+            WHERE gg.group_id = ${groupId}
+          )
+      `
+    : await sql`
+        SELECT e.user_id, e.game_id, e.variant, e.parsed_value, e.solved,
+               g.metric_direction, e.detail
+        FROM entries e
+        JOIN games g ON g.id = e.game_id
+        WHERE e.puzzle_date = ${today}::date
+          AND e.superseded_by IS NULL AND e.is_late = false
+          AND g.active = true
+      `) as {
+    user_id: string;
+    game_id: string;
+    variant: string | null;
+    parsed_value: number;
+    solved: boolean;
+    metric_direction: "lower_better" | "higher_better";
+    detail: ResultDetail | null;
+  }[];
+
+  const todayDetail = computeTodayDetail({
+    games,
+    entries: todayEntryRows.map((r) => ({
+      playerId: r.user_id,
+      gameId: r.game_id,
+      variant: r.variant,
+      value: r.parsed_value,
+      solved: r.solved,
+      direction: r.metric_direction,
+      detail: r.detail ?? null,
+    })),
+    viewerId: viewerUserId,
+  });
+
+  return NextResponse.json({ ...result, todayDetail, displayName: guard.viewer.displayName ?? null });
 }
