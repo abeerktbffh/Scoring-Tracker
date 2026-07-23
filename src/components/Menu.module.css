@@ -30,6 +30,9 @@
   gap: var(--space-1);
   transform: translateY(-100%);
   transition: transform 0.2s ease;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
 }
 
 .panelOpen {
