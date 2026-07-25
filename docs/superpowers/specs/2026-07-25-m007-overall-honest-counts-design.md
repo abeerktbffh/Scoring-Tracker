@@ -55,6 +55,12 @@ logged the game does not appear. No code change is required for clause 2.
   no-peek block is shared after the row query, so removing it fixes both.
 - The response shape is unchanged (`{ window, locked, players, viewerName }`); `locked` is
   now always `false` for this route.
+- **Update the now-false documentation** in this file: the header docstring (the "No-peek
+  always stays keyed on the viewer's global play for the day…" sentence) and the inline
+  no-peek comments above the deleted block. They must describe the new behavior (overall board
+  is never gated; participation + today's medals are shown for all players) rather than the
+  removed no-peek logic. `src/scoring/noPeek.ts` stays as-is — it is still used by the per-game
+  board route.
 
 **Not changed:**
 - `src/app/api/games/[gameId]/board/route.ts` — per-game no-peek and player-restriction stay
@@ -87,6 +93,11 @@ Update `src/app/api/leaderboard/leaderboard.test.ts`:
   medal tally to the viewer's played games. These describe the behavior being removed.
 - **Remove** the now-dead "dedicated played-today query" mock steps for the daily-window
   cases (the route no longer issues that query).
+- **Delete outright** the test "unlocks a group-scoped daily leaderboard when the viewer
+  played a game the group doesn't track" (currently `leaderboard.test.ts:177-192`). It exists
+  only to prove the deleted "global played-today query wins over group-filtered rows" logic;
+  after the change it would still pass while asserting nothing real, and its premise is false.
+  Remove it rather than leaving a vacuous test.
 - **Add**: on the daily window, `locked` is always `false`; every player's `gamesPlayed`
   reflects *all* of their today entries (not capped by the viewer); the medal tally reflects
   *all* of today's per-game winners regardless of what the viewer played. Include a case where
