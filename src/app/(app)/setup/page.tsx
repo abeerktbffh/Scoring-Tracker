@@ -60,11 +60,13 @@ function AndroidSteps(): JSX.Element {
   }, []);
   return (
     <ol className={styles.steps}>
+      <li><span className={styles.muted}>Open Bragboard in <b>Chrome</b> (not Samsung Internet or another browser).</span></li>
       <li>
         <button type="button" className={styles.btn} onClick={() => deferred?.prompt?.()}>Install app</button>
-        <span className={styles.muted}>{deferred ? "Then reopen Bragboard from your home screen." : "If nothing happens, use Chrome's menu → Install app."}</span>
+        <span className={styles.muted}>{deferred ? "Or use Chrome's menu (⋮) → “Install app”." : "If nothing happens, use Chrome's menu (⋮) → “Install app”."} <b>Not</b> &quot;Add to Home screen&quot; — that makes a shortcut that can&apos;t receive shares.</span>
       </li>
-      <li><span className={styles.muted}>Once installed, tap a game&apos;s <b>Share</b> and choose Bragboard.</span></li>
+      <li><span className={styles.muted}><b>Open the installed app once</b> so Chrome finishes setting it up.</span></li>
+      <li><span className={styles.muted}>In any game, tap <b>Share</b> and choose <b>Bragboard</b>. Don&apos;t see it? Tap <b>More</b> and turn it on once.</span></li>
     </ol>
   );
 }

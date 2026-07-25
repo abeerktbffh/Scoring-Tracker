@@ -72,4 +72,27 @@ describe("/setup (Android)", () => {
     fireEvent.click(btn);
     await waitFor(() => expect(promptFn).toHaveBeenCalled());
   });
+
+  it("steers users to install via Chrome, not Add to Home screen", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/platform", () => ({ detectPlatform: () => "android" }));
+    const { default: SetupA } = await import("./page");
+    render(<SetupA />);
+    // Must steer users to Chrome (the "not Samsung Internet" aside is unique to step 1)...
+    expect(screen.getByText(/not Samsung Internet/i)).toBeTruthy();
+    // ...and explicitly warn off "Add to Home screen" (the shortcut trap).
+    expect(screen.getByText(/add to home screen/i)).toBeTruthy();
+    expect(screen.getByText(/can.?t receive shares/i)).toBeTruthy();
+  });
+
+  it("tells users to open the app once and where to find the More share toggle", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/platform", () => ({ detectPlatform: () => "android" }));
+    const { default: SetupA } = await import("./page");
+    render(<SetupA />);
+    expect(screen.getByText(/open the installed app once/i)).toBeTruthy();
+    // The "if you don't see it, tap More" tip (already on iOS; now on Android too).
+    // "More" is bolded (own <b>), so match the trailing direct-text node.
+    expect(screen.getByText(/and turn it on once/i)).toBeTruthy();
+  });
 });
