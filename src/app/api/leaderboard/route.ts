@@ -18,8 +18,12 @@ const WINDOWS: Window[] = ["daily", "weekly", "monthly", "all"];
  *
  * An optional `?group=<id>` scopes the board to that group's members and
  * tracked-active games; access is then gated by `requireMember` (403 for
- * non-members). No-peek always stays keyed on the viewer's global play for
- * the day, never the group-scoped row set.
+ * non-members).
+ *
+ * The Overall board is never no-peek gated (M007): it shows every player's
+ * honest participation (games played) and the day's medal leaders regardless
+ * of what the viewer has played, and is never locked. No-peek stays only on
+ * the per-game board, which reveals exact scores.
  */
 export async function GET(req: Request) {
   const groupId = new URL(req.url).searchParams.get("group");
@@ -28,9 +32,6 @@ export async function GET(req: Request) {
 
   const param = new URL(req.url).searchParams.get("window");
   const window: Window = WINDOWS.includes(param as Window) ? (param as Window) : "daily";
-  // Viewer is resolved from the session, not a client-supplied param — used
-  // only for no-peek (restricts, never widens) and self-highlight.
-  const viewerUserId = guard.viewer.userId;
   const today = localDateInTz(PLATFORM_TZ);
   const start = windowStart(window, today);
 
@@ -73,31 +74,8 @@ export async function GET(req: Request) {
     metric_direction: "lower_better" | "higher_better";
   }[];
 
-  // No-peek: for the daily window, only reveal games the viewer has played today.
-  let visibleRows = rows;
-  let locked = false;
-  // No-peek is a UX/fairness aid, not a security boundary. The viewer is
-  // resolved from the session (never a client param); with no session user,
-  // treat the viewer as having played nothing (locked).
-  //
-  // "Played today" is a GLOBAL fact about the viewer, independent of which
-  // games a group tracks — derived from a dedicated query keyed only on the
-  // viewer's own user_id, never from the (possibly group-filtered) `rows`.
-  // Otherwise a member who played only a game the group doesn't track would
-  // be wrongly locked on that group's leaderboard.
-  if (window === "daily") {
-    const playedRows = (await sql`
-      SELECT DISTINCT game_id FROM entries
-      WHERE user_id = ${viewerUserId} AND puzzle_date = ${today}::date
-        AND superseded_by IS NULL AND is_late = false
-    `) as { game_id: string }[];
-    const playedGameIds = new Set(playedRows.map((r) => r.game_id));
-    locked = playedGameIds.size === 0;
-    visibleRows = rows.filter((r) => playedGameIds.has(r.game_id));
-  }
-
-  const names = new Map(visibleRows.map((r) => [r.user_id, r.display_name]));
-  const gameEntries: GameEntry[] = visibleRows.map((r) => ({
+  const names = new Map(rows.map((r) => [r.user_id, r.display_name]));
+  const gameEntries: GameEntry[] = rows.map((r) => ({
     playerId: r.user_id,
     gameId: r.game_id,
     variant: r.variant,
@@ -115,5 +93,5 @@ export async function GET(req: Request) {
     gamesPlayed: s.gamesPlayed,
     gamesLed: s.gamesLed, // gameIds; the client maps ids→names via its games catalog
   }));
-  return NextResponse.json({ window, locked, players, viewerName: guard.viewer.displayName ?? null });
+  return NextResponse.json({ window, locked: false, players, viewerName: guard.viewer.displayName ?? null });
 }
