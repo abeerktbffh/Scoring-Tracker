@@ -52,8 +52,7 @@ describe("GET /api/leaderboard", () => {
         solved: true,
         metric_direction: "lower_better",
       },
-    ]); // entries (no groups lookup anymore)
-    sqlMock.mockResolvedValueOnce([{ game_id: "g_wordle" }]); // dedicated played-today query
+    ]); // entries — the ONLY query the route issues now (no-peek removed)
 
     const res = await GET(req());
     expect(res.status).toBe(200);
@@ -73,9 +72,11 @@ describe("GET /api/leaderboard", () => {
     expect(queryText).not.toMatch(/players/i);
     expect(queryText).not.toMatch(/group_id/i);
     expect(queryText).toMatch(/u\.display_name IS NOT NULL/);
+    // Exactly one query — the dedicated played-today query is gone.
+    expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 
-  it("no-peek keys on the viewer's userId, not any player id", async () => {
+  it("daily Overall shows all players honestly even when the viewer has played nothing (no-peek removed)", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([
       {
@@ -89,20 +90,42 @@ describe("GET /api/leaderboard", () => {
         metric_direction: "lower_better",
       },
     ]);
-    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: viewer played nothing
 
     const res = await GET(req());
     const body = await res.json();
-    // Viewer (u_session) hasn't played today, so the board is locked and
-    // other users' entries are hidden despite existing in the row set.
-    expect(body.locked).toBe(true);
-    expect(body.players).toEqual([]);
+    // The viewer (u_session) has no entries, but the board is NOT locked and
+    // other players are shown honestly.
+    expect(body.locked).toBe(false);
+    expect(body.players).toEqual([
+      { displayName: "Other User", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_wordle"] },
+    ]);
+    // No dedicated played-today query is issued.
+    expect(sqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("each player's gamesPlayed reflects their OWN games, uncapped by the viewer", async () => {
+    requireUserMock.mockResolvedValue(USER_VIEWER);
+    // Viewer played 1 game today; Other played 3. Under the old no-peek rule
+    // Other's count would have been capped to the viewer's played games (1).
+    sqlMock.mockResolvedValueOnce([
+      { user_id: "u_session", display_name: "Session Player", game_id: "g_wordle", variant: null, puzzle_date: "2026-07-01", parsed_value: 4, solved: true, metric_direction: "lower_better" },
+      { user_id: "u_other", display_name: "Other Player", game_id: "g_wordle", variant: null, puzzle_date: "2026-07-01", parsed_value: 3, solved: true, metric_direction: "lower_better" },
+      { user_id: "u_other", display_name: "Other Player", game_id: "g_connections", variant: null, puzzle_date: "2026-07-01", parsed_value: 10, solved: true, metric_direction: "higher_better" },
+      { user_id: "u_other", display_name: "Other Player", game_id: "g_strands", variant: null, puzzle_date: "2026-07-01", parsed_value: 1, solved: true, metric_direction: "lower_better" },
+    ]);
+
+    const res = await GET(req());
+    const body = await res.json();
+    expect(body.locked).toBe(false);
+    const other = body.players.find((p: { displayName: string }) => p.displayName === "Other Player");
+    const session = body.players.find((p: { displayName: string }) => p.displayName === "Session Player");
+    expect(other.gamesPlayed).toBe(3);
+    expect(session.gamesPlayed).toBe(1);
   });
 
   it("uses requireUser and the global query when ?group= is absent", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([]);
-    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query
 
     await GET(req());
     expect(requireUserMock).toHaveBeenCalled();
@@ -133,7 +156,6 @@ describe("GET /api/leaderboard", () => {
         metric_direction: "lower_better",
       },
     ]);
-    sqlMock.mockResolvedValueOnce([{ game_id: "g_wordle" }]); // dedicated played-today query
 
     const res = await GET(req("http://localhost/api/leaderboard?group=g1"));
     expect(res.status).toBe(200);
@@ -150,7 +172,7 @@ describe("GET /api/leaderboard", () => {
     expect(call.slice(1)).toContain("g1");
   });
 
-  it("no-peek still keys on the viewer's global userId when scoped to a group", async () => {
+  it("a group-scoped daily board shows members honestly and is never locked (no-peek removed)", async () => {
     requireMemberMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([
       {
@@ -164,93 +186,27 @@ describe("GET /api/leaderboard", () => {
         metric_direction: "lower_better",
       },
     ]);
-    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: viewer played nothing
-
-    const res = await GET(req("http://localhost/api/leaderboard?group=g1"));
-    const body = await res.json();
-    // Viewer (u_session) hasn't played today, so still locked even though the
-    // row set is (in principle) group-scoped — no-peek is unaffected by group.
-    expect(body.locked).toBe(true);
-    expect(body.players).toEqual([]);
-  });
-
-  it("unlocks a group-scoped daily leaderboard when the viewer played a game the group doesn't track (dedicated global query wins over group-filtered rows)", async () => {
-    requireMemberMock.mockResolvedValue(USER_VIEWER);
-    // The group-filtered `rows` query returns nothing for this game (the
-    // group doesn't track it) — if `locked` were (incorrectly) derived from
-    // `rows`, the viewer would be wrongly locked.
-    sqlMock.mockResolvedValueOnce([]);
-    // The dedicated played-today query is keyed only on the viewer's own
-    // user_id/date, independent of the group's tracked-games filter, and
-    // reports a game the group doesn't track.
-    sqlMock.mockResolvedValueOnce([{ game_id: "g_connections" }]);
 
     const res = await GET(req("http://localhost/api/leaderboard?group=g1"));
     const body = await res.json();
     expect(body.locked).toBe(false);
-    expect(body.players).toEqual([]);
-  });
-
-  it("keeps a group-scoped daily leaderboard locked when the dedicated played-today query finds no global play", async () => {
-    requireMemberMock.mockResolvedValue(USER_VIEWER);
-    sqlMock.mockResolvedValueOnce([]);
-    sqlMock.mockResolvedValueOnce([]); // dedicated played-today query: no global play today
-
-    const res = await GET(req("http://localhost/api/leaderboard?group=g1"));
-    const body = await res.json();
-    expect(body.locked).toBe(true);
-    expect(body.players).toEqual([]);
+    expect(body.players).toEqual([
+      { displayName: "Other User", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_wordle"] },
+    ]);
+    // Only the entries query runs — no dedicated played-today query.
+    expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 
   it("computes a cross-game Overall medal tally (gold/silver/bronze, gamesPlayed, gamesLed) for window=weekly", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([
       // Wordle: Session wins (lower is better).
-      {
-        user_id: "u_session",
-        display_name: "Session Player",
-        game_id: "g_wordle",
-        variant: null,
-        puzzle_date: "2026-07-01",
-        parsed_value: 3,
-        solved: true,
-        metric_direction: "lower_better",
-      },
-      {
-        user_id: "u_other",
-        display_name: "Other Player",
-        game_id: "g_wordle",
-        variant: null,
-        puzzle_date: "2026-07-01",
-        parsed_value: 5,
-        solved: true,
-        metric_direction: "lower_better",
-      },
-      // Connections (same puzzle day, so the two entries actually compete):
-      // Other wins (higher is better).
-      {
-        user_id: "u_other",
-        display_name: "Other Player",
-        game_id: "g_connections",
-        variant: null,
-        puzzle_date: "2026-07-01",
-        parsed_value: 10,
-        solved: true,
-        metric_direction: "higher_better",
-      },
-      {
-        user_id: "u_session",
-        display_name: "Session Player",
-        game_id: "g_connections",
-        variant: null,
-        puzzle_date: "2026-07-01",
-        parsed_value: 2,
-        solved: true,
-        metric_direction: "higher_better",
-      },
+      { user_id: "u_session", display_name: "Session Player", game_id: "g_wordle", variant: null, puzzle_date: "2026-07-01", parsed_value: 3, solved: true, metric_direction: "lower_better" },
+      { user_id: "u_other", display_name: "Other Player", game_id: "g_wordle", variant: null, puzzle_date: "2026-07-01", parsed_value: 5, solved: true, metric_direction: "lower_better" },
+      // Connections (same puzzle day): Other wins (higher is better).
+      { user_id: "u_other", display_name: "Other Player", game_id: "g_connections", variant: null, puzzle_date: "2026-07-01", parsed_value: 10, solved: true, metric_direction: "higher_better" },
+      { user_id: "u_session", display_name: "Session Player", game_id: "g_connections", variant: null, puzzle_date: "2026-07-01", parsed_value: 2, solved: true, metric_direction: "higher_better" },
     ]);
-    // Aggregate windows are never no-peek gated for this route's "daily"
-    // check (window !== "daily" skips the played-today query entirely).
 
     const res = await GET(req("http://localhost/api/leaderboard?window=weekly"));
     expect(res.status).toBe(200);
@@ -258,65 +214,34 @@ describe("GET /api/leaderboard", () => {
     expect(body.window).toBe("weekly");
     expect(body.players).toEqual(
       expect.arrayContaining([
-        {
-          displayName: "Session Player",
-          gold: 1,
-          silver: 1,
-          bronze: 0,
-          gamesPlayed: 2,
-          gamesLed: ["g_wordle"],
-        },
-        {
-          displayName: "Other Player",
-          gold: 1,
-          silver: 1,
-          bronze: 0,
-          gamesPlayed: 2,
-          gamesLed: ["g_connections"],
-        },
+        { displayName: "Session Player", gold: 1, silver: 1, bronze: 0, gamesPlayed: 2, gamesLed: ["g_wordle"] },
+        { displayName: "Other Player", gold: 1, silver: 1, bronze: 0, gamesPlayed: 2, gamesLed: ["g_connections"] },
       ]),
     );
     expect(body.players).toHaveLength(2);
-    // Aggregate windows (non-daily) skip the dedicated played-today query.
     expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 
-  it("today's Overall reflects only today's per-game winners (default daily window)", async () => {
+  it("today's Overall reflects ALL today's per-game winners (no-peek removed)", async () => {
     requireUserMock.mockResolvedValue(USER_VIEWER);
     sqlMock.mockResolvedValueOnce([
-      {
-        user_id: "u_session",
-        display_name: "Session Player",
-        game_id: "g_wordle",
-        variant: null,
-        puzzle_date: "2026-07-01",
-        parsed_value: 3,
-        solved: true,
-        metric_direction: "lower_better",
-      },
-      {
-        user_id: "u_other",
-        display_name: "Other Player",
-        game_id: "g_connections",
-        variant: null,
-        puzzle_date: "2026-07-01",
-        parsed_value: 10,
-        solved: true,
-        metric_direction: "higher_better",
-      },
+      { user_id: "u_session", display_name: "Session Player", game_id: "g_wordle", variant: null, puzzle_date: "2026-07-01", parsed_value: 3, solved: true, metric_direction: "lower_better" },
+      { user_id: "u_other", display_name: "Other Player", game_id: "g_connections", variant: null, puzzle_date: "2026-07-01", parsed_value: 10, solved: true, metric_direction: "higher_better" },
     ]);
-    // Viewer has played g_wordle today, so g_wordle stays visible; without
-    // no-peek narrowing, g_connections would also count toward Other's gold.
-    sqlMock.mockResolvedValueOnce([{ game_id: "g_wordle" }]);
 
     const res = await GET(req());
     const body = await res.json();
     expect(body.window).toBe("daily");
     expect(body.locked).toBe(false);
-    // Only the visible (played-today) game's entries feed the Overall tally —
-    // Other Player's g_connections gold is hidden by no-peek.
-    expect(body.players).toEqual([
-      { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_wordle"] },
-    ]);
+    // Both players' games count — Other's g_connections gold is NO LONGER
+    // hidden (previously no-peek narrowed the tally to the viewer's games).
+    expect(body.players).toEqual(
+      expect.arrayContaining([
+        { displayName: "Session Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_wordle"] },
+        { displayName: "Other Player", gold: 1, silver: 0, bronze: 0, gamesPlayed: 1, gamesLed: ["g_connections"] },
+      ]),
+    );
+    expect(body.players).toHaveLength(2);
+    expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 });
