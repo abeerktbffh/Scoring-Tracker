@@ -44,7 +44,7 @@ describe("detectAndParse routing — thehindu.com vs indiamini.in (no collision)
   const cases: [string, string][] = [
     ["I just solved this Crossword in 59 seconds https://indiamini.in/play/?id=al-crossword-mini-20260702", "india-mini"],
     ["I scored 141 on this Crossword. Think you can do better? https://www.thehindu.com/?id=cc734818&set=thehindu-mini-crossword&puzzleType=crossword", "hindu-mini"],
-    ["I just solved this Crossword in 3 minutes and 7 seconds. https://www.thehindu.com/crosswords/hindu-one-down", "easy-down"],
+    ["I scored 69 on this Crossword. Think you can do better? https://www.thehindu.com/?id=sdfoioe&set=hindu-one-down&puzzleType=crossword", "easy-down"],
   ];
   for (const [text, gameId] of cases) {
     it(`routes to ${gameId}`, () => {
