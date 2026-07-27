@@ -36,12 +36,16 @@ bigger is better).
 - **Detection marker →** the query param `set=thehindu-mini-crossword`, i.e.
   `/set=thehindu-mini-crossword/i`. This is the reliable identifier in the new URL and does not
   collide with Easy Down's `set=hindu-one-down`.
-- **Value extraction →** `/scored\s+(\d+)/i`, capturing the integer score (e.g. `141`).
+- **Value extraction →** `/scored\s+([\d,]+)/i`, then strip commas and `parseInt` (comma-safe,
+  mirroring the Wordle parser's `[\d,]+`), capturing the integer score (e.g. `141`).
 - Return `{ gameId: "hindu-mini", puzzleNumber: null, variant: null, value: <score>,
   solved: true, detail: { points: <score> }, puzzleDate: null }`.
 - If the marker matches but no score is found, throw (as today) so nothing bogus logs. The
   old time-format links no longer match the marker and simply won't parse — acceptable; that
   format is retired.
+- **Accepted unknown:** the parser always returns `solved: true` (matches today's behaviour;
+  no "didn't finish" sample exists). If The Hindu ever emits a failed-attempt points share it
+  would mis-log as solved — flagged, not handled, pending evidence.
 - The parser stays registered in `src/parsers/registry.ts` unchanged (only its internals
   change). `detectAndParse` dispatch is unaffected.
 
@@ -50,11 +54,22 @@ bigger is better).
 - Add `points?: number;` to `ResultDetail` (alongside `seconds?`), for the Hindu Mini score.
   One-line, backward-compatible addition.
 
-### 3. Display — `src/lib/formatResult.ts`
+### 3. Display — `src/lib/formatResult.ts` AND `src/components/StatPills.tsx`
 
 - Add a new `ResultShape` value `"points"`.
 - Change `RESULT_SHAPE["hindu-mini"]` from `"timed"` to `"points"`.
-- The `"points"` case renders `` `${value} pts` `` (e.g. `141 pts`).
+- **`formatResult`** (the board "Result" column): the `"points"` case renders
+  `` `${value} pts` `` (e.g. `141 pts`). Its `switch` has no `default` and no trailing return,
+  so adding `"points"` to `ResultShape` **forces** a case at compile time (TS2366) — the
+  compiler is the safety net here.
+- **`src/components/StatPills.tsx`** (the expanded daily-contest detail pills): this file has a
+  **second** `switch (shapeForGame(gameId))`, but with a trailing `return out`, so a missing
+  `"points"` case does **not** fail compilation — it silently drops the value pill. Add a
+  `"points"` case that pushes `` `${d.points} pts` `` (falling back to `value` if `d.points` is
+  absent, since old entries have no `points` in detail). Without this, Hindu Mini's drill-down
+  would show only "Solved"/medal with no number.
+- `src/components/DailyContestTable.tsx` `GRID_SHAPES` (`{wordle, connections, hints}`) already
+  excludes `"points"`, so no grid renders for it — correct, no change.
 - Consequence (accepted): existing time-based Hindu Mini entries store `value` = seconds, so
   they will now render as e.g. `171 pts`. This is the known keep-old-entries trade-off.
 
@@ -63,8 +78,12 @@ bigger is better).
 - The ranking direction lives in the `games` table (`metric_direction`), seeded `lower_better`
   for hindu-mini. Change it to `higher_better`:
   `UPDATE games SET metric_direction='higher_better' WHERE id='hindu-mini';`
-- Update the local seed source so a re-seed matches (the hindu-mini row that
-  `scripts/bug-automation/add-hindu-games.mjs` / seed defines).
+- Update the local seed source so a re-seed matches: **`scripts/add-hindu-games.mjs:9`** —
+  the row `["hindu-mini", "Hindu Mini", "timed", "lower_better", "hindu-mini", false]` →
+  change `"lower_better"` to `"higher_better"`. (`scripts/seed.mjs` does **not** define
+  hindu-mini, so it needs no change.) Note that script uses `ON CONFLICT (id) DO NOTHING`, so
+  re-running it will **not** update the existing prod row — which is exactly why the manual
+  `UPDATE` above is required.
 - The scoring functions (`isBetter`, `computeDailyContest`, `medals.ts`) already take
   `metric_direction` as input, so no scoring-code change is needed — flipping the row makes new
   points rank correctly.
@@ -79,6 +98,10 @@ bigger is better).
   young game; can be cleaned later.
 - **Easy Down:** untouched, deferred pending a sample.
 - **Puzzle-date handling, no-peek, entry storage:** unchanged.
+- **`gameLinks.ts` play-icon URL (out of scope, flagged):** `src/lib/gameLinks.ts` still maps
+  hindu-mini's F002 "play" icon to the old `thehindu.com/crosswords/thehindu-mini-crossword/`
+  path, which may now 404. Not part of the detection/logging fix; note for an owner check and a
+  possible quick follow-up, not blocking B007.
 
 ## Testing
 
@@ -91,6 +114,8 @@ bigger is better).
   - An old time-format string (`/crosswords/thehindu-mini-crossword`, "in 2 minutes 51 seconds")
     is no longer detected as Hindu Mini.
 - **`src/lib/formatResult.ts` test** — hindu-mini `value: 141` → `"141 pts"`.
+- **`src/components/StatPills.tsx` test** — a hindu-mini row with `detail: { points: 141 }`
+  renders a `141 pts` pill (guards the silent-drop gap the compiler doesn't catch).
 - **Registry** — a full `detectAndParse` on the sample routes to hindu-mini (guards against a
   marker collision with Easy Down / India Mini).
 
