@@ -1,5 +1,6 @@
 import { tallyWins, isBetter, type GameEntry } from "./wins";
 import { currentStreak, longestStreak } from "./streaks";
+import { ALL_DAYS } from "./schedule";
 
 export type DatedGameEntry = GameEntry & { puzzleDate: string };
 
@@ -16,6 +17,7 @@ export function computeGameBoard(
   entries: DatedGameEntry[],
   today: string,
   start: string | null,
+  publishDays: readonly number[] = ALL_DAYS,
 ): GameBoardStat[] {
   const inWindow = (d: string) => start === null || d >= start;
   const windowed = entries.filter((e) => inWindow(e.puzzleDate));
@@ -41,8 +43,8 @@ export function computeGameBoard(
       wins: winsById.get(playerId) ?? 0,
       gamesPlayed: win.length,
       bestValue,
-      currentStreak: currentStreak(allDates, today),
-      longestStreak: longestStreak(allDates),
+      currentStreak: currentStreak(allDates, today, publishDays),
+      longestStreak: longestStreak(allDates, publishDays),
     };
   });
 

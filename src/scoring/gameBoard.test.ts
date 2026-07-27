@@ -63,4 +63,13 @@ describe("computeGameBoard", () => {
     expect(r[0].bestValue).toBe(20);
     expect(r[1].bestValue).toBe(10);
   });
+  it("threads a weekday-only schedule so Fri→Mon stays consecutive", () => {
+    const entries: DatedGameEntry[] = [
+      e("a", "2026-07-24", 4), // Fri
+      e("a", "2026-07-27", 3), // Mon
+    ];
+    const r = computeGameBoard(entries, "2026-07-27", null, [1, 2, 3, 4, 5]);
+    expect(r[0].currentStreak).toBe(2);
+    expect(r[0].longestStreak).toBe(2);
+  });
 });
