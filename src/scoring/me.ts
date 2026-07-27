@@ -1,4 +1,5 @@
 import { computeGameBoard, type DatedGameEntry } from "@/scoring/gameBoard";
+import { publishDaysFor } from "@/scoring/schedule";
 import type { ResultDetail } from "@/parsers/types";
 
 export interface MeEntry {
@@ -80,7 +81,7 @@ export function computeMe(input: MeInput): MeResult {
       direction: e.direction,
       puzzleDate: e.puzzleDate,
     }));
-    const board = computeGameBoard(datedEntries, today, null);
+    const board = computeGameBoard(datedEntries, today, null, publishDaysFor(g.id));
     const stat = board.find((s) => s.playerId === "me");
     return {
       gameId: g.id,
