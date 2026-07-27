@@ -1,7 +1,7 @@
 import { formatClock } from "./time";
 import type { ResultDetail } from "@/parsers/types";
 
-export type ResultShape = "timed" | "wordle" | "pinpoint" | "connections" | "hints";
+export type ResultShape = "timed" | "wordle" | "pinpoint" | "connections" | "hints" | "points";
 
 // Per-game value shape. Everything not listed is timed (mm:ss) — including
 // NYT Mini (manual, no parser) and any future timed game.
@@ -16,7 +16,7 @@ export const RESULT_SHAPE: Record<string, ResultShape> = {
   tango: "timed",
   "mini-sudoku": "timed",
   "india-mini": "timed",
-  "hindu-mini": "timed",
+  "hindu-mini": "points",
   "easy-down": "timed",
   zip: "timed",
   crossclimb: "timed",
@@ -57,5 +57,7 @@ export function formatResult(
       return value === 0 ? "Perfect" : plural(value, "mistake", "mistakes");
     case "hints":
       return value === 0 ? "No hints" : plural(value, "hint", "hints");
+    case "points":
+      return `${value} pts`;
   }
 }

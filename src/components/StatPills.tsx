@@ -40,6 +40,9 @@ function pills(gameId: string, row: DailyContestRow): string[] {
       if (typeof d.redraws === "number") out.push(`${d.redraws} redraws`);
       if (d.difficulty) out.push(d.difficulty);
       break;
+    case "points":
+      out.push(`${d.points ?? row.value} pts`);
+      break;
   }
   return out;
 }

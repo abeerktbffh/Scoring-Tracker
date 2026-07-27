@@ -11,6 +11,7 @@ describe("shapeForGame", () => {
     expect(shapeForGame("pips")).toBe("timed");
     expect(shapeForGame("queens")).toBe("timed");
     expect(shapeForGame("nyt-mini")).toBe("timed");
+    expect(shapeForGame("hindu-mini")).toBe("points");
   });
   it("defaults unknown games to timed", () => {
     expect(shapeForGame("totally-new-game")).toBe("timed");
@@ -21,6 +22,9 @@ describe("formatResult", () => {
   it("timed -> mm:ss (incl. 0:0N and 9:53)", () => {
     expect(formatResult("queens", 31, true)).toBe("0:31");
     expect(formatResult("pips", 593, true)).toBe("9:53");
+  });
+  it("Points -> N pts (Hindu Mini)", () => {
+    expect(formatResult("hindu-mini", 141, true)).toBe("141 pts");
   });
   it("Wordle solved -> n/6 with a check; failed -> X/6 with a cross (never raw 7)", () => {
     expect(formatResult("wordle", 3, true)).toBe("3/6 ✓");
