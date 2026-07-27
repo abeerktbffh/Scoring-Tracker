@@ -58,7 +58,18 @@ Add pure weekday/publish-day helpers and an optional `publishDays` argument (def
   loop, ≤ 7 iterations since `days` is non-empty).
 - `prevPublishDay(dayNum, days)` = largest `d ≤ dayNum` with `isPublishDay(d, days)` (≤ 7).
 
-Rewrite the two exports with a default `publishDays = [0..6]`:
+**Typing (avoids TS2322):** the new params are typed `readonly number[]` and default to
+`ALL_DAYS`. `ALL_DAYS` is `as const` (a `readonly` tuple), which is assignable to
+`readonly number[]` but NOT to `number[]` — so the params must be `readonly number[]`
+(and `publishDaysFor` returning a mutable `number[]` is still assignable to that). Do not type
+the params as `number[]` with an `as const` default.
+
+The `nextPublishDay`/`prevPublishDay` helpers assume a non-empty `publishDays` (their bounded
+loop relies on at least one publishing weekday). This holds for every caller because
+`publishDaysFor` never returns `[]`; the helpers may include a defensive comment but need no
+runtime guard.
+
+Rewrite the two exports with a default `publishDays: readonly number[] = ALL_DAYS`:
 
 - **`longestStreak(datesPlayed, publishDays = ALL_DAYS)`** — over the sorted-unique day numbers,
   two adjacent plays `days[i-1], days[i]` are consecutive iff
@@ -96,8 +107,15 @@ StreakBadge). No other consumer.
 - **No schema migration** (schedule lives in code).
 - **Ranking/medals untouched** — this touches only streak counts.
 - **All non-Easy-Down games unchanged** (default daily schedule = current behaviour).
-- Off-schedule stray entries (e.g. a Sat Easy Down row, which shouldn't occur) don't crash —
-  the helpers accept any day number; such a play simply may not extend a run. Not special-cased.
+- **Timezone/DST is not a concern:** day numbers come from `toDayNumber` applied to
+  `YYYY-MM-DD` *date strings* (`puzzleDate`, and `today` already localised via
+  `localDateInTz("Asia/Kolkata")`). No wall-clock instant is used, so `weekdayOf` returns the
+  true civil weekday regardless of runtime TZ/DST.
+- **Off-schedule stray entries** (e.g. a Saturday Easy Down row, which shouldn't occur since
+  there's no weekend puzzle) don't crash — the helpers accept any day number. Such a play may
+  not extend a run, and in the specific case where the stray day *is* today it can leave
+  `currentStreak` at 0 (because `latest > recent`). This is an accepted edge; real Easy Down
+  entries fall on Mon–Fri, so it does not arise in practice. Not special-cased.
 
 ## Testing
 
