@@ -28,6 +28,17 @@ The metric changed: Easy Down was a **timed** game (`lower_better`, seconds). It
 - **Keep** existing time-based Easy Down entries (no deletion).
 - Board display: **`N pts`** (reusing the `"points"` shape shipped in B007).
 
+### Consequence of keep-old-entries + direction flip (owner-acknowledged)
+
+Flipping `metric_direction` to `higher_better` is **retroactive**, so it re-ranks the old
+time-based days too. Old entries store `value` = seconds (lower was better), so under
+higher-better the **slowest** old time now "wins" that day. Data check (2026-07-27): Easy Down
+has **9 historical puzzle-days, of which exactly 2 had 2+ players** — **2026-07-13** and
+**2026-07-16** (2 players each). Only those two days' medal/win assignments invert; every other
+historical day is single-player (rank is direction-independent) and unaffected. This propagates
+into all-time medal/win aggregates for those two days only. Accepted as part of keep-old-entries;
+the two days can be cleared later if it ever matters.
+
 ## Design (mirrors B007, scoped to `easy-down`)
 
 ### 1. Parser — `src/parsers/easyDown.ts` (rewrite)
@@ -60,6 +71,9 @@ The metric changed: Easy Down was a **timed** game (`lower_better`, seconds). It
   `"lower_better"` to `"higher_better"`. (That script's `ON CONFLICT DO NOTHING` means
   re-running won't touch the prod row — the manual `UPDATE` is what flips prod.)
 - No scoring-code change: `isBetter`/`medals`/streaks read `metric_direction` from the row.
+- The `games.type` column stays `"timed"` — it drives neither display (RESULT_SHAPE keys off
+  gameId) nor ranking (keys off metric_direction); it's admin/API metadata only. Left as-is,
+  consistent with B007's hindu-mini row. Only the `metric_direction` field changes.
 
 ### Not changed / reused
 
@@ -71,6 +85,10 @@ The metric changed: Easy Down was a **timed** game (`lower_better`, seconds). It
 - **Hindu Mini** — untouched (already fixed in B007).
 - **Accepted unknown:** parser always returns `solved: true` (no failed-share sample), same as
   B007.
+- **`gameLinks.ts` play-icon URL (out of scope, flagged):** `src/lib/gameLinks.ts:18` still maps
+  easy-down's F002 "play" icon to the old `thehindu.com/crosswords/hindu-one-down/` path, which
+  may 404 now. Not part of the detection/logging fix; consistent with B007 leaving hindu-mini's
+  old path. Note for a possible owner check, not blocking.
 
 ## Testing
 
