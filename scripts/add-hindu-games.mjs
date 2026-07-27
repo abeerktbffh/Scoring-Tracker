@@ -7,7 +7,7 @@ const sql = neon(process.env.DATABASE_URL);
 // [id, name, type, metric_direction, parser_id, has_variants]
 const games = [
   ["hindu-mini", "Hindu Mini", "timed", "higher_better", "hindu-mini", false],
-  ["easy-down", "Easy Down", "timed", "lower_better", "easy-down", false],
+  ["easy-down", "Easy Down", "timed", "higher_better", "easy-down", false],
 ];
 for (const [id, name, type, dir, parserId, hasVariants] of games) {
   await sql`INSERT INTO games (id, name, type, metric_direction, parser_id, has_variants, active)
