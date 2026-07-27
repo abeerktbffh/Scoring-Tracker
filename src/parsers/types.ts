@@ -19,6 +19,7 @@ export interface ResultDetail {
   underPar?: number | null; // Minute Cryptic
   // Timed (Queens/Tango/Mini Sudoku/India Mini/Hindu Mini/Easy Down/NYT Mini/Zip/Crossclimb/Patches/Wend/Pips)
   seconds?: number;
+  points?: number;          // Hindu Mini score (higher better)
   backtracks?: number;      // Zip
   redraws?: number;         // Patches
   fillOrder?: number[];     // Crossclimb

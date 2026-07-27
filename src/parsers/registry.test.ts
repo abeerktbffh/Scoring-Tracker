@@ -33,6 +33,7 @@ describe("detectAndParse routes every known game", () => {
     ["queens", "Queens #792\n0:31 👑", "queens"],
     ["tango", "Tango #632\n0:23 🌗", "tango"],
     ["mini-sudoku", "Mini Sudoku #324 | 0:38 ✏️", "mini-sudoku"],
+    ["hindu-mini", "I scored 141 on this Crossword. Think you can do better? https://www.thehindu.com/?id=cc734818&set=thehindu-mini-crossword&puzzleType=crossword", "hindu-mini"],
   ];
   it.each(cases)("routes %s text to the right parser", (_label, text, expectedGameId) => {
     expect(detectAndParse(text)?.gameId).toBe(expectedGameId);
@@ -42,7 +43,7 @@ describe("detectAndParse routes every known game", () => {
 describe("detectAndParse routing — thehindu.com vs indiamini.in (no collision)", () => {
   const cases: [string, string][] = [
     ["I just solved this Crossword in 59 seconds https://indiamini.in/play/?id=al-crossword-mini-20260702", "india-mini"],
-    ["I just solved The Hindu Mini in 2 minutes and 51 seconds. https://www.thehindu.com/crosswords/thehindu-mini-crossword", "hindu-mini"],
+    ["I scored 141 on this Crossword. Think you can do better? https://www.thehindu.com/?id=cc734818&set=thehindu-mini-crossword&puzzleType=crossword", "hindu-mini"],
     ["I just solved this Crossword in 3 minutes and 7 seconds. https://www.thehindu.com/crosswords/hindu-one-down", "easy-down"],
   ];
   for (const [text, gameId] of cases) {
